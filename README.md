@@ -4,8 +4,10 @@ This repo is where I'll be doing most of my AI homework. Working together with p
 aNTiCS game is created and curated by Andrew Nuxoll and various students of the University of Portland AI course.
 
 To run the game, you will need Python 2.7.x and pygame, found here:
+
     [Pygame download](http://www.pygame.org/download.shtml)
     [Python 2.7.x download](https://www.python.org/downloads/release/python-2713/)
+    
 In the terminal/command prompt, simply execute the command `python Game.py` in the aNTiCS directory.
 
 #Homework 1
