@@ -29,7 +29,7 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "Offensive Strategist")
+        super(AIPlayer,self).__init__(inputPlayerId, "Offensive")
         #the coordinates of the agent's food and tunnel will be stored in these
         #variables (see getMove() below)
         self.myFood = None
@@ -81,8 +81,8 @@ class AIPlayer(Player):
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
         numWorkers = len(getAntList(currentState, me, (WORKER,)))
+        myWorkers = getAntList(currentState, me, (WORKER,))
 
-        print currentState
         #the first time this method is called, the food and tunnel locations
         #need to be recorded in their respective instance variables
         if (self.myTunnel == None):
@@ -98,11 +98,6 @@ class AIPlayer(Player):
                     self.myFood = food
                     bestDistSoFar = dist
 
-        #if I don't have a worker, give up. -----> delete this rule
-        numAnts = len(myInv.ants)
-        if (numAnts == 1):
-            return Move(END, None, None)
-
         #if the queen is on the anthill move her
         if (myInv.getQueen().coords == myInv.getAnthill().coords):
             return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
@@ -115,10 +110,8 @@ class AIPlayer(Player):
 
         #if the worker has already moved, we're done
         #make sure to move all workers
-        myWorkers = getAntList(currentState, me, (WORKER,))
         for worker in myWorkers:
-            if (worker.hasMoved): #continue
-                return Move(END, None, None)
+            if (worker.hasMoved): continue
 
             #if the worker has food, move toward tunnel
             if (worker.carrying):
@@ -131,6 +124,7 @@ class AIPlayer(Player):
                 path = createPathToward(currentState, worker.coords,
                                         self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
+        return Move(END, None, None)
 
     ##
     #getAttack
