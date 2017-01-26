@@ -80,7 +80,9 @@ class AIPlayer(Player):
         #Useful pointers
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
+        numWorkers = len(getAntList(currentState, me, (WORKER,)))
 
+        print currentState
         #the first time this method is called, the food and tunnel locations
         #need to be recorded in their respective instance variables
         if (self.myTunnel == None):
@@ -105,30 +107,30 @@ class AIPlayer(Player):
         if (myInv.getQueen().coords == myInv.getAnthill().coords):
             return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
 
-        #if I have enough food, build another worker to gather food. Don't build more than 2 workers.
-        if (myInv.foodCount > 1):
-            return Move(BUILD, [myInv.getAnthill().coords], WOKRER)
+        #if I have enough food, build another worker to gather food.
+        #Don't build more than 2 workers.
+        if (myInv.foodCount > 1 and numWorkers < 2):
+            if (getAntAt(currentState, myInv.getAnthill().coords) is None):
+                return Move(BUILD, [myInv.getAnthill().coords], WORKER)
 
         #if the worker has already moved, we're done
-        myWorker = getAntList(currentState, me, (WORKER,))[0]
-        if (myWorker.hasMoved):
-            return Move(END, None, None)
+        #make sure to move all workers
+        myWorkers = getAntList(currentState, me, (WORKER,))
+        for worker in myWorkers:
+            if (worker.hasMoved): #continue
+                return Move(END, None, None)
 
-        #if the worker has food, move toward tunnel
-        if (myWorker.carrying):
-            path = createPathToward(currentState, myWorker.coords,
-                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
-            return Move(MOVE_ANT, path, None)
+            #if the worker has food, move toward tunnel
+            if (worker.carrying):
+                path = createPathToward(currentState, worker.coords,
+                                        self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+                return Move(MOVE_ANT, path, None)
 
-        #if the worker has no food, move toward food
-        else:
-            path = createPathToward(currentState, myWorker.coords,
-                                    self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-            return Move(MOVE_ANT, path, None)
-
-        #if we see the enemy has offensive ants, build some to counteract
-
-
+            #if the worker has no food, move toward food
+            else:
+                path = createPathToward(currentState, worker.coords,
+                                        self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                return Move(MOVE_ANT, path, None)
 
     ##
     #getAttack
