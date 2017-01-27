@@ -81,7 +81,7 @@ class AIPlayer(Player):
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
         numWorkers = len(getAntList(currentState, me, (WORKER,)))
-        myWorkers = getAntList(currentState, me, (WORKER,))
+        numSoldiers = len(getAntList(currentState, me, (SOLDIER,)))
 
         #the first time this method is called, the food and tunnel locations
         #need to be recorded in their respective instance variables
@@ -102,6 +102,11 @@ class AIPlayer(Player):
         if (myInv.getQueen().coords == myInv.getAnthill().coords):
             return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
 
+        #if we have enough food, build a soldier? drone?
+        if (myInv.foodCount > 3 and numSoldiers < 2):
+            if (getAntAt(currentState, myInv.getAnthill().coords) is None):
+                return Move(BUILD, [myInv.getAnthill().coords], SOLDIER)
+
         #if I have enough food, build another worker to gather food.
         #Don't build more than 2 workers.
         if (myInv.foodCount > 1 and numWorkers < 2):
@@ -110,6 +115,7 @@ class AIPlayer(Player):
 
         #if the worker has already moved, we're done
         #make sure to move all workers
+        myWorkers = getAntList(currentState, me, (WORKER,))
         for worker in myWorkers:
             if (worker.hasMoved): continue
 
@@ -117,6 +123,13 @@ class AIPlayer(Player):
             if (worker.carrying):
                 path = createPathToward(currentState, worker.coords,
                                         self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+
+                #if there is an ant in my way, find a different path
+                for coord in listReachableAdjacent(currentState, worker.coords, 2):
+                    if getAntAt(currentState, coord):
+                        listAllLegalMoves(currentState)
+                        #make arbitrary legal move to get out of the way
+                        path = listAllLegalMoves(currentState)[0]
                 return Move(MOVE_ANT, path, None)
 
             #if the worker has no food, move toward food
@@ -124,16 +137,63 @@ class AIPlayer(Player):
                 path = createPathToward(currentState, worker.coords,
                                         self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
+            # reachable = listReachableAdjacent(currentState, worker.coords, 2)
+            # for coord in reachable:
+            #     if
+
+        #move our soldiers. one to the enemy side and one that stays right on our border.
+        mySoldiers = getAntList(currentState, me, (SOLDIER,))
+
+        #move to the enemy side
+        if (numSoldiers == 1):
+            if not (mySoldiers[0].hasMoved):
+                mySoldierX = mySoldiers[0].coords[0]
+                mySoldierY = mySoldiers[0].coords[1]
+                if (mySoldierY < 8): #if the y is less than 7, we havent reached the enemy's side
+                    mySoldierY += 1
+                else:
+                    return Move(END, None, None) #end our movement forward for now
+                    #getAttack(currentState, mySoldiers[0], enemyLocation1)
+                if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, mySoldiers[0].coords, 2):
+                    return Move(MOVE_ANT, [mySoldiers[0].coords, (mySoldierX, mySoldierY)], None)
+                else:
+                    return Move(MOVE_ANT, [mySoldiers[0].coords], None)
+
+        #stay right on our border (is there a method to tell which is our territory?)
+        #do we always assume that our grid has (0,0) on the bottom left?
+        if (numSoldiers == 2):
+            if not (mySoldiers[1].hasMoved):
+                mySoldierX = mySoldiers[1].coords[0]
+                mySoldierY = mySoldiers[1].coords[1]
+                if (mySoldierY < 4): #if the y is less than 7, we havent reached the enemy's side
+                    mySoldierY += 1
+                elif (mySoldierX < 5):
+                    mySoldierX += 1
+                else:
+                    return Move(END, None, None) #end our movement forward for now
+                    #getAttack(currentState, mySoldiers[0], enemyLocation1)
+                if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, mySoldiers[1].coords, 3):
+                    return Move(MOVE_ANT, [mySoldiers[1].coords, (mySoldierX, mySoldierY)], None)
+                else:
+                    return Move(MOVE_ANT, [mySoldiers[1].coords], None)
         return Move(END, None, None)
 
     ##
     #getAttack
     #
-    # This agent never attacks
+    # get the attack that we want to perform on the enemy.
+    # currentState - the game state
+    # attackingAnt - the Ant object currently making the attack
+    # enemyLocations - The Location objects of the Enemies that can be attacked
     #
     def getAttack(self, currentState, attackingAnt, enemyLocations):
-        #if we have offensive ants, lets see where the enemy is
-        # attack only if they are in our territory?
+        #scan the surrounding area for an enemy
+        #getAntList(currentState, !me, None) -> all enemy ants?
+        #
+
+        #if there is an enemy, attack until you cant attack anymore (aka die)
+
+        #scan again. if there are no enemies, stay where you are
         return enemyLocations[0]  #don't care
 
     ##
