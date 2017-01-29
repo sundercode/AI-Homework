@@ -29,96 +29,201 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "Simple Food Gatherer")
+        super(AIPlayer,self).__init__(inputPlayerId, "MattAI")
         #the coordinates of the agent's food and tunnel will be stored in these
         #variables (see getMove() below)
         self.myFood = None
+        self.myFood1 = None
+        self.myFood2 = None
         self.myTunnel = None
-    
+        self.myAnthill = None
+        self.enemyAnthill = None
+        self.enemyTunnel = None
+        #self.playerId = imputPlayerId
+
     ##
-    #getPlacement 
+    #getPlacement
     #
     # The agent uses a hardcoded arrangement for phase 1 to provide maximum
     # protection to the queen.  Enemy food is placed randomly.
     #
+    #
+
+
+
+    #Adjust this to set some more optimal placement
     def getPlacement(self, currentState):
         self.myFood = None
+        self.myFood1 = None
+        self.myFood2 = None
         self.myTunnel = None
+        self.enemyAnthill = None
+        self.enemyTunnel = None
+        self.constrCoords = None
+
+        if (currentState.whoseTurn == PLAYER_TWO):
+            #we are player 1
+            enemy = 1
+        else:
+            enemy = 0
+
         if currentState.phase == SETUP_PHASE_1:
-            return [(0,0), (5, 1), 
-                    (0,3), (1,2), (2,1), (3,0), \
-                    (0,2), (1,1), (2,0), \
-                    (0,1), (1,0) ];
+            return [(2,1), (7, 2),
+                    (6,3), (5,3), (0,3), (1,3), \
+                    (2,3), (3,3), (4,3), \
+                    (5,0), (9,0) ];
+
+        #set the enemy food to the least optimal places
         elif currentState.phase == SETUP_PHASE_2:
+            self.enemyAnthill = getConstrList(currentState, enemy, (ANTHILL,))[0]
+            self.enemyTunnel = getConstrList(currentState, enemy, (TUNNEL,))[0]
             numToPlace = 2
             moves = []
             for i in range(0, numToPlace):
-                move = None
-                while move == None:
-                    #Choose any x location
-                    x = random.randint(0, 9)
-                    #Choose any y location on enemy side of the board
-                    y = random.randint(6, 9)
-                    #Set the move if this space is empty
-                    if currentState.board[x][y].constr == None and (x, y) not in moves:
-                        move = (x, y)
-                        #Just need to make the space non-empty. So I threw whatever I felt like in there.
-                        currentState.board[x][y].constr == True
-                moves.append(move)
+                for j in range(0,9):
+                    for k in range (6,9):
+                        move = None
+                        #while move == None:
+                            #Find the farthest open space
+                        if(((stepsToReach(currentState, (j,k), self.enemyTunnel.coords)) + (stepsToReach(currentState, (j,k), self.enemyAnthill.coords)))\
+                                > ((stepsToReach(currentState, moves, self.enemyTunnel.coords)) + (stepsToReach(currentState, moves, self.enemyAnthill.coords)))):
+                            #moves = (j,k)
+                                #Set the move if this space is empty
+                                if currentState.board[j][k].constr == None and (j, k) not in moves:
+                                    move = (j, k)
+                                    #Just need to make the space non-empty. So I threw whatever I felt like in there.
+                                    currentState.board[j][k].constr == True
+                                    moves.append(move)
             return moves
-        else:            
-            return None  #should never happen
-    
+
+
     ##
     #getMove
     #
-    # This agent simply gathers food as fast as it can with its worker.  It
-    # never attacks and never builds more ants.  The queen is never moved.
     #
+    #Adjust this to create more ants and start with a greater gathering force to get food faster
+    #also try to adjust efficieny and opt for the best paths and ants for the gathering job
     ##
     def getMove(self, currentState):
         #Useful pointers
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
+        foods = getConstrList(currentState, None, (FOOD,))
+        bestDistSoFar = 1000 #i.e., infinity
+        bestDistSoFar2 = 1000 #i.e., infinity
 
+        #if (me == 1)
+        #    enemy = 2
+        #else
+        #    enemy = 1
         #the first time this method is called, the food and tunnel locations
         #need to be recorded in their respective instance variables
+        if (self.myAnthill == None):
+            self.myAnthill = getConstrList(currentState, me, (ANTHILL,))[0]
         if (self.myTunnel == None):
             self.myTunnel = getConstrList(currentState, me, (TUNNEL,))[0]
         if (self.myFood == None):
             foods = getConstrList(currentState, None, (FOOD,))
             self.myFood = foods[0]
             #find the food closest to the tunnel
-            bestDistSoFar = 1000 #i.e., infinity
             for food in foods:
                 dist = stepsToReach(currentState, self.myTunnel.coords, food.coords)
                 if (dist < bestDistSoFar):
-                    self.myFood = food
+                    self.myFood1 = food
                     bestDistSoFar = dist
 
-        #if I don't have a worker, give up.  QQ
-        numAnts = len(myInv.ants)
-        if (numAnts == 1):
-            return Move(END, None, None)
+            #find the closest to the anthill
+            for food in foods:
+                dist2 = stepsToReach(currentState, self.myAnthill.coords, food.coords)
+                if (dist2 < bestDistSoFar2):
+                    self.myFood2 = food
+                    bestDistSoFar2 = dist2
 
-        #if the worker has already moved, we're done
-        myWorker = getAntList(currentState, me, (WORKER,))[0]
-        if (myWorker.hasMoved):
-            return Move(END, None, None)
-        
-        #if the worker has food, move toward tunnel
-        if (myWorker.carrying):
-            path = createPathToward(currentState, myWorker.coords,
-                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+            #if(self.myFood1 == None):
+            #        self.myFood1 = foods[1]
+            #    else:
+            #        self.myFood1 = foods[0]
+#
+#            if(self.myFood2 == None):
+#                if(self.myFood1 == foods[0]):
+#                    self.myFood2 = foods[1]
+#                else:
+#                    self.myFood2 = foods[0]
+        #if the queen is on the anthill move her
+        if (myInv.getQueen().coords == myInv.getAnthill().coords):
+            path = createPathToward(currentState, myInv.getQueen().coords,
+                                        (0,3), UNIT_STATS[QUEEN][MOVEMENT])
             return Move(MOVE_ANT, path, None)
-            
-        #if the worker has no food, move toward food
-        else:
-            path = createPathToward(currentState, myWorker.coords,
-                                    self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-            return Move(MOVE_ANT, path, None)
-                              
-    
+
+        #Start with 2 Workers
+        numAnts = len(myInv.ants)
+        if (myInv.foodCount > 1 and numAnts < 5 and getAntAt(currentState, self.myAnthill.coords) == None):
+            return Move(BUILD, [self.myAnthill.coords], WORKER)
+
+        #Then 2 Drones
+        #if (myInv.foodCount > 1 and numAnts < 5 and getAntAt(currentState, self.myAnthill.coords) == None):
+        #    return Move(BUILD, [self.myAnthill.coords], DRONE)
+
+        #Then Soldiers whenever we are able, if our opponent has any attacking units
+        if (myInv.foodCount > 3 and numAnts > 5 and getAntAt(currentState, self.myAnthill.coords) == None):
+            return Move(BUILD, [self.myAnthill.coords], SOLDIER)
+
+
+       #WORKER Orders
+        myWorkers = getAntList(currentState, me, (WORKER,))
+        for index, worker in enumerate(myWorkers):
+            if (worker.hasMoved): continue
+            if(index == 0 or index == 2):
+                constrCoords = self.myTunnel.coords
+                targetFood = self.myFood1
+            else:
+                constrCoords = self.myAnthill.coords
+                targetFood = self.myFood2
+
+
+            #if the worker has food, move toward constr
+            if (worker.carrying):
+                path = createPathToward(currentState, worker.coords,
+                                        constrCoords, UNIT_STATS[WORKER][MOVEMENT])
+                if (path == [worker.coords]):
+                        path = listAllMovementPaths(currentState,worker.coords, UNIT_STATS[WORKER][MOVEMENT])[0]
+                return Move(MOVE_ANT, path, None)
+
+            #if the worker has no food, move toward food
+            else:
+                path = createPathToward(currentState, worker.coords,
+                                        targetFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                if (path == [worker.coords]):
+                    path = listAllMovementPaths(currentState,worker.coords, UNIT_STATS[WORKER][MOVEMENT])[0]
+                return Move(MOVE_ANT, path, None)
+
+        #DRONE Orders
+        myDrones = getAntList(currentState, me, (DRONE,))
+        for i, drone in enumerate(myDrones):
+            if (drone.hasMoved): continue
+            if(i == 1):
+                constrCoords = self.myAnthill.coords
+                targetFood = self.myFood2
+            else:
+                constrCoords = self.myTunnel.coords
+                targetFood = self.myFood1
+
+            #if the drone has food, move toward tunnel
+            if (drone.carrying):
+                path = createPathToward(currentState, drone.coords,
+                                        constrCoords, UNIT_STATS[DRONE][MOVEMENT])
+                if (path == [drone.coords]):
+                        path = listAllMovementPaths(currentState,drone.coords, UNIT_STATS[DRONE][MOVEMENT])[0]
+                return Move(MOVE_ANT, path, None)
+
+            #if the drone has no food, move toward food
+            else:
+                path = createPathToward(currentState, drone.coords,
+                                        targetFood.coords, UNIT_STATS[DRONE][MOVEMENT])
+                if (path == [drone.coords]):
+                    path = listAllMovementPaths(currentState,drone.coords, UNIT_STATS[DRONE][MOVEMENT])[0]
+                return Move(MOVE_ANT, path, None)
+        return Move(END, None, None)
     ##
     #getAttack
     #
@@ -126,7 +231,7 @@ class AIPlayer(Player):
     #
     def getAttack(self, currentState, attackingAnt, enemyLocations):
         return enemyLocations[0]  #don't care
-        
+
     ##
     #registerWin
     #
