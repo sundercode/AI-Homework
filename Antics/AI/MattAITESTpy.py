@@ -29,12 +29,10 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "MattAI")
+        super(AIPlayer,self).__init__(inputPlayerId, "MattAITEST")
         #the coordinates of the agent's food and tunnel will be stored in these
         #variables (see getMove() below)
         self.myFood = None
-        self.myFood1 = None
-        self.myFood2 = None
         self.myTunnel = None
         self.myAnthill = None
         self.enemyAnthill = None
@@ -54,8 +52,6 @@ class AIPlayer(Player):
     #Adjust this to set some more optimal placement
     def getPlacement(self, currentState):
         self.myFood = None
-        self.myFood1 = None
-        self.myFood2 = None
         self.myTunnel = None
         self.enemyAnthill = None
         self.enemyTunnel = None
@@ -95,12 +91,16 @@ class AIPlayer(Player):
                                     currentState.board[j][k].constr == True
                                     moves.append(move)
             return moves
-
+            #else:
+                                #return None  #should never happen
 
     ##
     #getMove
     #
     #
+
+
+
     #Adjust this to create more ants and start with a greater gathering force to get food faster
     #also try to adjust efficieny and opt for the best paths and ants for the gathering job
     ##
@@ -108,10 +108,10 @@ class AIPlayer(Player):
         #Useful pointers
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
-        foods = getConstrList(currentState, None, (FOOD,))
+        foods = getConstrList(currentState, me, (FOOD,))
         bestDistSoFar = 1000 #i.e., infinity
-        bestDistSoFar2 = 1000 #i.e., infinity
-
+        Food1 = None
+        Food2 = None
         #if (me == 1)
         #    enemy = 2
         #else
@@ -129,26 +129,12 @@ class AIPlayer(Player):
             for food in foods:
                 dist = stepsToReach(currentState, self.myTunnel.coords, food.coords)
                 if (dist < bestDistSoFar):
-                    self.myFood1 = food
+                    Food1 = food.coords
                     bestDistSoFar = dist
 
             #find the closest to the anthill
-            for food in foods:
-                dist2 = stepsToReach(currentState, self.myAnthill.coords, food.coords)
-                if (dist2 < bestDistSoFar2):
-                    self.myFood2 = food
-                    bestDistSoFar2 = dist2
 
-            #if(self.myFood1 == None):
-            #        self.myFood1 = foods[1]
-            #    else:
-            #        self.myFood1 = foods[0]
-#
-#            if(self.myFood2 == None):
-#                if(self.myFood1 == foods[0]):
-#                    self.myFood2 = foods[1]
-#                else:
-#                    self.myFood2 = foods[0]
+
         #if the queen is on the anthill move her
         if (myInv.getQueen().coords == myInv.getAnthill().coords):
             path = createPathToward(currentState, myInv.getQueen().coords,
@@ -157,34 +143,44 @@ class AIPlayer(Player):
 
         #Start with 2 Workers
         numAnts = len(myInv.ants)
-        if (myInv.foodCount > 1 and numAnts < 5 and getAntAt(currentState, self.myAnthill.coords) == None):
+        if (myInv.foodCount > 0 and numAnts < 3 and getAntAt(currentState, self.myAnthill.coords) == None):
             return Move(BUILD, [self.myAnthill.coords], WORKER)
 
         #Then 2 Drones
-        #if (myInv.foodCount > 1 and numAnts < 5 and getAntAt(currentState, self.myAnthill.coords) == None):
-        #    return Move(BUILD, [self.myAnthill.coords], DRONE)
+        if (myInv.foodCount > 1 and numAnts < 5 and getAntAt(currentState, self.myAnthill.coords) == None):
+            return Move(BUILD, [self.myAnthill.coords], DRONE)
 
         #Then Soldiers whenever we are able, if our opponent has any attacking units
         if (myInv.foodCount > 3 and numAnts > 5 and getAntAt(currentState, self.myAnthill.coords) == None):
-            return Move(BUILD, [self.myAnthill.coords], SOLDIER)
+            return Move(BUILD, [self.myAnthill.coords], DRONE)
 
+
+
+        for  food in foods:
+            if (food.coords != Food1.coords):
+                Food2 = food.coords
 
        #WORKER Orders
         myWorkers = getAntList(currentState, me, (WORKER,))
         for index, worker in enumerate(myWorkers):
             if (worker.hasMoved): continue
-            if(index == 0 or index == 2):
-                constrCoords = self.myTunnel.coords
-                targetFood = self.myFood1
+
+            #if((stepsToReach(currentState, worker.coords, self.myTunnel.coords))
+            #                            > (stepsToReach(currentState, worker.coords, self.myAnthill.coords))):
+            #    constrCoords = self.myAnthill.coords
+            #else:
+            #    constrCoords = self.myTunnel.coords
+
+            if (index == 0):
+                targetFood = Food1
+                targetConstr = self.myTunnel.coords
             else:
-                constrCoords = self.myAnthill.coords
-                targetFood = self.myFood2
-
-
-            #if the worker has food, move toward constr
+                targetFood = Food2
+                targetConstr = self.myAnthill.coords
+            #if the worker has food, move toward tunnel
             if (worker.carrying):
                 path = createPathToward(currentState, worker.coords,
-                                        constrCoords, UNIT_STATS[WORKER][MOVEMENT])
+                                        targetConstr, UNIT_STATS[WORKER][MOVEMENT])
                 if (path == [worker.coords]):
                         path = listAllMovementPaths(currentState,worker.coords, UNIT_STATS[WORKER][MOVEMENT])[0]
                 return Move(MOVE_ANT, path, None)
@@ -192,34 +188,42 @@ class AIPlayer(Player):
             #if the worker has no food, move toward food
             else:
                 path = createPathToward(currentState, worker.coords,
-                                        targetFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                                        targetFood, UNIT_STATS[WORKER][MOVEMENT])
                 if (path == [worker.coords]):
                     path = listAllMovementPaths(currentState,worker.coords, UNIT_STATS[WORKER][MOVEMENT])[0]
                 return Move(MOVE_ANT, path, None)
+        #return Move(END, None, None)
 
         #DRONE Orders
         myDrones = getAntList(currentState, me, (DRONE,))
-        for i, drone in enumerate(myDrones):
-            if (drone.hasMoved): continue
-            if(i == 1):
+        for drone in myDrones:
+            #find closest food and place to put it
+            #for food in foods:
+            #    dist = stepsToReach(currentState, drone.coords, food.coords)
+            #    if (dist < bestDistSoFar):
+            #        self.myFood = food
+            #        bestDistSoFar = dist
+
+            if((stepsToReach(currentState, drone.coords, self.myTunnel.coords))
+                                        > (stepsToReach(currentState, drone.coords, self.myAnthill.coords))):
                 constrCoords = self.myAnthill.coords
-                targetFood = self.myFood2
             else:
                 constrCoords = self.myTunnel.coords
-                targetFood = self.myFood1
 
+
+            if (drone.hasMoved): continue
             #if the drone has food, move toward tunnel
             if (drone.carrying):
                 path = createPathToward(currentState, drone.coords,
                                         constrCoords, UNIT_STATS[DRONE][MOVEMENT])
                 if (path == [drone.coords]):
-                        path = listAllMovementPaths(currentState,drone.coords, UNIT_STATS[DRONE][MOVEMENT])[0]
+                    path = listAllMovementPaths(currentState,drone.coords, UNIT_STATS[DRONE][MOVEMENT])[0]
                 return Move(MOVE_ANT, path, None)
 
             #if the drone has no food, move toward food
             else:
                 path = createPathToward(currentState, drone.coords,
-                                        targetFood.coords, UNIT_STATS[DRONE][MOVEMENT])
+                                        self.myFood.coords, UNIT_STATS[DRONE][MOVEMENT])
                 if (path == [drone.coords]):
                     path = listAllMovementPaths(currentState,drone.coords, UNIT_STATS[DRONE][MOVEMENT])[0]
                 return Move(MOVE_ANT, path, None)
