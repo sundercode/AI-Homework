@@ -119,17 +119,23 @@ class AIPlayer(Player):
         for worker in myWorkers:
             if (worker.hasMoved): continue
 
+            #if there is an ant in my way, find a different path
+            for coord in listAdjacent(worker.coords):
+                print getAntAt(currentState, coord)
+                if (type(getAntAt(currentState, coord)) is not None):
+                    print "we are trying to find a legal move for my worker"
+
+                    #make arbitrary legal move to get out of the way
+                    path = createPathToward(currentState, worker.coords,
+                                            coord,UNIT_STATS[WORKER][MOVEMENT])
+                    return Move(MOVE_ANT, path, None)
+                else:
+                    break
+
             #if the worker has food, move toward tunnel
             if (worker.carrying):
                 path = createPathToward(currentState, worker.coords,
                                         self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
-
-                #if there is an ant in my way, find a different path
-                for coord in listReachableAdjacent(currentState, worker.coords, 2):
-                    if getAntAt(currentState, coord):
-                        listAllLegalMoves(currentState)
-                        #make arbitrary legal move to get out of the way
-                        path = listAllLegalMoves(currentState)[0]
                 return Move(MOVE_ANT, path, None)
 
             #if the worker has no food, move toward food
@@ -137,45 +143,44 @@ class AIPlayer(Player):
                 path = createPathToward(currentState, worker.coords,
                                         self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
-            # reachable = listReachableAdjacent(currentState, worker.coords, 2)
-            # for coord in reachable:
-            #     if
+
 
         #move our soldiers. one to the enemy side and one that stays right on our border.
         mySoldiers = getAntList(currentState, me, (SOLDIER,))
 
-        #move to the enemy side
-        if (numSoldiers == 1):
-            if not (mySoldiers[0].hasMoved):
-                mySoldierX = mySoldiers[0].coords[0]
-                mySoldierY = mySoldiers[0].coords[1]
-                if (mySoldierY < 8): #if the y is less than 7, we havent reached the enemy's side
-                    mySoldierY += 1
-                else:
-                    return Move(END, None, None) #end our movement forward for now
-                    #getAttack(currentState, mySoldiers[0], enemyLocation1)
-                if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, mySoldiers[0].coords, 2):
-                    return Move(MOVE_ANT, [mySoldiers[0].coords, (mySoldierX, mySoldierY)], None)
-                else:
-                    return Move(MOVE_ANT, [mySoldiers[0].coords], None)
-
-        #stay right on our border (is there a method to tell which is our territory?)
-        #do we always assume that our grid has (0,0) on the bottom left?
-        if (numSoldiers == 2):
-            if not (mySoldiers[1].hasMoved):
-                mySoldierX = mySoldiers[1].coords[0]
-                mySoldierY = mySoldiers[1].coords[1]
-                if (mySoldierY < 4): #if the y is less than 7, we havent reached the enemy's side
-                    mySoldierY += 1
-                elif (mySoldierX < 5):
-                    mySoldierX += 1
-                else:
-                    return Move(END, None, None) #end our movement forward for now
-                    #getAttack(currentState, mySoldiers[0], enemyLocation1)
-                if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, mySoldiers[1].coords, 3):
-                    return Move(MOVE_ANT, [mySoldiers[1].coords, (mySoldierX, mySoldierY)], None)
-                else:
-                    return Move(MOVE_ANT, [mySoldiers[1].coords], None)
+        # #move to the enemy side
+        # if (numSoldiers == 1):
+        #     solider1 = mySoldiers[0]
+        #     if not (soldier1.hasMoved):
+        #         mySoldierX = soldier1.coords[0]
+        #         mySoldierY = soldier1.coords[1]
+        #         if (mySoldierY < 8): #if the y is less than 7, we havent reached the enemy's side
+        #             mySoldierY += 1
+        #         else:
+        #             return Move(END, None, None) #end our movement forward for now
+        #             #getAttack(currentState, soldier1, enemyLocation1)
+        #         if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier1.coords, 2):
+        #             return Move(MOVE_ANT, [soldier1.coords, (mySoldierX, mySoldierY)], None)
+        #         else:
+        #             return Move(MOVE_ANT, [soldier1.coords], None)
+        #
+        # #stay right on our border
+        # if (numSoldiers == 2): #this moves both of the soldier ants...
+        #     soldier2 = mySoldiers[1]
+        #     if not (soldier2.hasMoved):
+        #         mySoldierX = soldier2.coords[0]
+        #         mySoldierY = soldier2.coords[1]
+        #         if (mySoldierY < 4): #if the y is less than 7, we havent reached the enemy's side
+        #             mySoldierY += 1
+        #         elif (mySoldierX < 5):
+        #             mySoldierX += 1
+        #         else:
+        #             return Move(END, None, None) #end our movement forward for now
+        #             #getAttack(currentState, mySoldiers[0], enemyLocation1)
+        #         if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier2.coords, 3):
+        #             return Move(MOVE_ANT, [soldier2.coords, (mySoldierX, mySoldierY)], None)
+        #         else:
+        #             return Move(MOVE_ANT, [soldier2.coords], None)
         return Move(END, None, None)
 
     ##
@@ -202,5 +207,5 @@ class AIPlayer(Player):
     # This agent doens't learn
     #
     def registerWin(self, hasWon):
-        #method templaste, not implemented
+        #method template, not implemented
         pass
