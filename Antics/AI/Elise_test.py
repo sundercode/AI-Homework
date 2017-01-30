@@ -103,13 +103,13 @@ class AIPlayer(Player):
             return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
 
         #if we have enough food, build a soldier
-        if (myInv.foodCount > 3 and numSoldiers < 3):
+        if (myInv.foodCount > 3 and numSoldiers < 2):
             if (getAntAt(currentState, myInv.getAnthill().coords) is None):
                 return Move(BUILD, [myInv.getAnthill().coords], SOLDIER)
 
         #if I have enough food, build another worker to gather food.
         #Don't build more than 2 workers.
-        if (myInv.foodCount > 1 and numWorkers < 2):
+        if (myInv.foodCount > 1 and numWorkers < 3):
             if (getAntAt(currentState, myInv.getAnthill().coords) is None):
                 return Move(BUILD, [myInv.getAnthill().coords], WORKER)
 
@@ -139,13 +139,13 @@ class AIPlayer(Player):
                     mySoldierY += 1
                 else:
                     mySoldierX += 1
-                    #find the queen, what is the pid for the enemy player??
-                    enemyQueen = getAntList(currentState, PLAYER_TWO, (QUEEN,))
+                    #find the queen
+                    enemyQueen = getAntList(currentState, None, (QUEEN,))
                     #create a path toward the queen
+                    #print enemyQueen[0].coords
                     soldierPath = createPathToward(currentState, soldier.coords,
-                                                    enemyQueen[0].coords, UNIT_STATS[SOLDIER][MOVEMENT])
-                    print enemyQueen[0].coords
-                    return Move(MOVE_ANT, soldierPath, None)
+                                                 enemyQueen[0].coords, UNIT_STATS[SOLDIER][MOVEMENT])
+                    Move(MOVE_ANT, soldierPath, None)
                 if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier.coords, 2):
                     return Move(MOVE_ANT, [soldier.coords, (mySoldierX, mySoldierY)], None)
                 else:
