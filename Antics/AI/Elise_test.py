@@ -72,8 +72,8 @@ class AIPlayer(Player):
     ##
     #getMove
     #
-    # This agent simply gathers food as fast as it can with its worker.  It
-    # never attacks and never builds more ants.  The queen is never moved.
+    #This agent will build 2 workers to gather food and build soldiers to
+    #protect it's territory, while sending some into the enemy side.
     #
     ##
     def getMove(self, currentState):
@@ -102,8 +102,8 @@ class AIPlayer(Player):
         if (myInv.getQueen().coords == myInv.getAnthill().coords):
             return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
 
-        #if we have enough food, build a soldier? drone?
-        if (myInv.foodCount > 3 and numSoldiers < 2):
+        #if we have enough food, build a soldier
+        if (myInv.foodCount > 3 and numSoldiers < 3):
             if (getAntAt(currentState, myInv.getAnthill().coords) is None):
                 return Move(BUILD, [myInv.getAnthill().coords], SOLDIER)
 
@@ -113,74 +113,44 @@ class AIPlayer(Player):
             if (getAntAt(currentState, myInv.getAnthill().coords) is None):
                 return Move(BUILD, [myInv.getAnthill().coords], WORKER)
 
-        #if the worker has already moved, we're done
-        #make sure to move all workers
+        ##USE MATTS MOVE WORKER METHOD
         myWorkers = getAntList(currentState, me, (WORKER,))
         for worker in myWorkers:
             if (worker.hasMoved): continue
-
-            #if there is an ant in my way, find a different path
-            for coord in listAdjacent(worker.coords):
-                print getAntAt(currentState, coord)
-                if (type(getAntAt(currentState, coord)) is not None):
-                    print "we are trying to find a legal move for my worker"
-
-                    #make arbitrary legal move to get out of the way
-                    path = createPathToward(currentState, worker.coords,
-                                            coord,UNIT_STATS[WORKER][MOVEMENT])
-                    return Move(MOVE_ANT, path, None)
-                else:
-                    break
-
             #if the worker has food, move toward tunnel
             if (worker.carrying):
                 path = createPathToward(currentState, worker.coords,
                                         self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
-
             #if the worker has no food, move toward food
             else:
                 path = createPathToward(currentState, worker.coords,
                                         self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
+        ##USE MATT'S MOVE WORKER METHOD
 
-
-        #move our soldiers. one to the enemy side and one that stays right on our border.
+        #move our soldiers. They all try to find the queen
         mySoldiers = getAntList(currentState, me, (SOLDIER,))
-
-        # #move to the enemy side
-        # if (numSoldiers == 1):
-        #     solider1 = mySoldiers[0]
-        #     if not (soldier1.hasMoved):
-        #         mySoldierX = soldier1.coords[0]
-        #         mySoldierY = soldier1.coords[1]
-        #         if (mySoldierY < 8): #if the y is less than 7, we havent reached the enemy's side
-        #             mySoldierY += 1
-        #         else:
-        #             return Move(END, None, None) #end our movement forward for now
-        #             #getAttack(currentState, soldier1, enemyLocation1)
-        #         if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier1.coords, 2):
-        #             return Move(MOVE_ANT, [soldier1.coords, (mySoldierX, mySoldierY)], None)
-        #         else:
-        #             return Move(MOVE_ANT, [soldier1.coords], None)
-        #
-        # #stay right on our border
-        # if (numSoldiers == 2): #this moves both of the soldier ants...
-        #     soldier2 = mySoldiers[1]
-        #     if not (soldier2.hasMoved):
-        #         mySoldierX = soldier2.coords[0]
-        #         mySoldierY = soldier2.coords[1]
-        #         if (mySoldierY < 4): #if the y is less than 7, we havent reached the enemy's side
-        #             mySoldierY += 1
-        #         elif (mySoldierX < 5):
-        #             mySoldierX += 1
-        #         else:
-        #             return Move(END, None, None) #end our movement forward for now
-        #             #getAttack(currentState, mySoldiers[0], enemyLocation1)
-        #         if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier2.coords, 3):
-        #             return Move(MOVE_ANT, [soldier2.coords, (mySoldierX, mySoldierY)], None)
-        #         else:
-        #             return Move(MOVE_ANT, [soldier2.coords], None)
+        for soldier in mySoldiers:
+            if not (soldier.hasMoved):
+                mySoldierX = soldier.coords[0]
+                mySoldierY = soldier.coords[1]
+                if (mySoldierY < 8): #move to enemy's side
+                    mySoldierY += 1
+                else:
+                    mySoldierX += 1
+                    #find the queen, what is the pid for the enemy player??
+                    enemyQueen = getAntList(currentState, PLAYER_TWO, (QUEEN,))
+                    #create a path toward the queen
+                    soldierPath = createPathToward(currentState, soldier.coords,
+                                                    enemyQueen[0].coords, UNIT_STATS[SOLDIER][MOVEMENT])
+                    print enemyQueen[0].coords
+                    return Move(MOVE_ANT, soldierPath, None)
+                if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier.coords, 2):
+                    return Move(MOVE_ANT, [soldier.coords, (mySoldierX, mySoldierY)], None)
+                else:
+                    return Move(MOVE_ANT, [soldier.coords], None)
+        #If our move hasnt been ended, end our move here.
         return Move(END, None, None)
 
     ##
@@ -192,9 +162,14 @@ class AIPlayer(Player):
     # enemyLocations - The Location objects of the Enemies that can be attacked
     #
     def getAttack(self, currentState, attackingAnt, enemyLocations):
+        #Useful pointers
+        myInv = getCurrPlayerInventory(currentState)
+        me = currentState.whoseTurn
+        numWorkers = len(getAntList(currentState, me, (WORKER,)))
+        numSoldiers = len(getAntList(currentState, me, (SOLDIER,)))
+
         #scan the surrounding area for an enemy
-        #getAntList(currentState, !me, None) -> all enemy ants?
-        #
+        print "I am trying to find an attack for my soldier"
 
         #if there is an enemy, attack until you cant attack anymore (aka die)
 
