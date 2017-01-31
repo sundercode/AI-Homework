@@ -180,7 +180,7 @@ class AIPlayer(Player):
                     path = listAllMovementPaths(currentState,worker.coords, UNIT_STATS[WORKER][MOVEMENT])[0]
                 return Move(MOVE_ANT, path, None)
 
-        #move our soldiers. They all try to find the queen
+        #SOLDIER orders. They move to the enemy side and bother the queen
         mySoldiers = getAntList(currentState, me, (SOLDIER,))
         for soldier in mySoldiers:
             if not (soldier.hasMoved):
@@ -189,19 +189,18 @@ class AIPlayer(Player):
                 if (mySoldierY < 8): #move to enemy's side
                     mySoldierY += 1
                 else:
-                    mySoldierX += 1
                     #find the queen
                     enemyQueen = getAntList(currentState, None, (QUEEN,))
                     #create a path toward the queen
-                    #print enemyQueen[0].coords
-                    soldierPath = createPathToward(currentState, soldier.coords,
+                    soldierPath = createPathToward(currentState, (mySoldierX, mySoldierY),
                                                  enemyQueen[0].coords, UNIT_STATS[SOLDIER][MOVEMENT])
-                    Move(MOVE_ANT, soldierPath, None)
+                    return Move(MOVE_ANT, soldierPath, None)
                 if (mySoldierX,mySoldierY) in listReachableAdjacent(currentState, soldier.coords, 2):
                     return Move(MOVE_ANT, [soldier.coords, (mySoldierX, mySoldierY)], None)
                 else:
                     return Move(MOVE_ANT, [soldier.coords], None)
-        #If our move hasnt been ended, end our move here.
+
+        #If our move hasnt been ended by now, end our move here.
         return Move(END, None, None)
     ##
     #getAttack

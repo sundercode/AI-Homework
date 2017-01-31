@@ -80,8 +80,10 @@ class AIPlayer(Player):
                     for k in range (6,9):
                         move = None
                         #Find the farthest open space
-                        if(((stepsToReach(currentState, (j,k), self.enemyTunnel.coords)) + (stepsToReach(currentState, (j,k), self.enemyAnthill.coords)))\
-                            > ((stepsToReach(currentState, moves, self.enemyTunnel.coords)) + (stepsToReach(currentState, moves, self.enemyAnthill.coords)))):
+                        if(((stepsToReach(currentState, (j,k), self.enemyTunnel.coords))\
+                            + (stepsToReach(currentState, (j,k), self.enemyAnthill.coords)))
+                            > ((stepsToReach(currentState, moves, self.enemyTunnel.coords))\
+                            + (stepsToReach(currentState, moves, self.enemyAnthill.coords)))):
                             #Set the move if this space is empty
                             if currentState.board[j][k].constr == None and (j, k) not in moves:
                                 move = (j, k)
