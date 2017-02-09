@@ -176,19 +176,52 @@ class AIPlayer(Player):
         me = currentState.whoseTurn
         enemy = (currentState.whoseTurn + 1) % 2
 
+        myInv = getCurrPlayerInventory(currentState)
+        enemyInv = []
+
+        if (myInv.player != me):
+            enemyInv = myInv
+
         #Metrics that are important to evaluate:
         # number of ants each player has
         myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
         enemyAntCount = len(getAntList(currentState, enemy, (QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
 
         # types of ants each player has. We assume that there's only one queen.
+        # would it be better to take all of the ants on each side and increment a count per the type?
         myWorkers = getAntList(currentState, me,(WORKER,))
         myDrones = getAntList(currentState, me, (DRONE,))
         mySoldiers = getAntList(currentState, me, (SOLDIER,))
 
-        myWorkers = getAntList(currentState, me,(WORKER,))
-        myDrones = getAntList(currentState, me, (DRONE,))
-        mySoldiers = getAntList(currentState, me, (SOLDIER,))
+        enemyWorkers = getAntList(currentState, me,(WORKER,))
+        enemyDrones = getAntList(currentState, me, (DRONE,))
+        enemySoldiers = getAntList(currentState, me, (SOLDIER,))
+
+        # health of ants that each player has.
+        # just loop through each ant and access ant.health property
+        # if an ant's health is not full, we can assume we are being threatened
+        #full health we can assume that we are doing ok, and can up the move score.
+
+        # How much food each player has
+        myFood = myInv.foodCount
+        enemyFood = enemyInv.foodCount
+
+        # how much food each player's workers are carrying.
+        i = 0
+        for i, worker in myWorkers:
+            if (worker.carrying):
+                i+=1
+        j = 0
+        for j, worker in enemyWorkers:
+            if (worker.carrying):
+                j+=1
+
+        # how threatened are each players queens? (proximity to enemy)
+        # If our queen is threatened the most, the movescore gets decrimented (if > 0.0)
+        # if our enemy is, the move score would increase. ++ 0.1? (if< 1.0)
+
+        # how well protected my anthill is.
+        # count grass nodes and get their proximity to the anthill.
 
         return moveScore
     ##
