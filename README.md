@@ -22,3 +22,11 @@ challenge. Your agent should be able to play 100 games against the random
 agent in less than five minutes on a lab computer. In addition, your agent
 must meet the core criteria (below). The design of this agent is totally up to
 you.
+
+#Homework 2
+Informed Search Agent
+
+##Description
+Your assignment is to create an Antics agent that performs a multi-level, heuristically guided
+search of the Antics state space.
+
