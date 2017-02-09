@@ -96,11 +96,6 @@ class AIPlayer(Player):
                     self.myFood = food
                     bestDistSoFar = dist
 
-        #if the hasn't moved, have her move in place so she will attack
-        myQueen = myInv.getQueen()
-        if (not myQueen.hasMoved):
-            return Move(MOVE_ANT, [myQueen.coords], None)
-
         #if I don't have a worker, give up.  QQ
         numAnts = len(myInv.ants)
         if (numAnts == 1):

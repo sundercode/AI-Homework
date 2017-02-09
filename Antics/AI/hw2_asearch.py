@@ -29,14 +29,14 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "Simple Food Gatherer")
+        super(AIPlayer,self).__init__(inputPlayerId, "A* Search")
         #the coordinates of the agent's food and tunnel will be stored in these
         #variables (see getMove() below)
         self.myFood = None
         self.myTunnel = None
-    
+
     ##
-    #getPlacement 
+    #getPlacement
     #
     # The agent uses a hardcoded arrangement for phase 1 to provide maximum
     # protection to the queen.  Enemy food is placed randomly.
@@ -45,7 +45,7 @@ class AIPlayer(Player):
         self.myFood = None
         self.myTunnel = None
         if currentState.phase == SETUP_PHASE_1:
-            return [(0,0), (5, 1), 
+            return [(0,0), (5, 1),
                     (0,3), (1,2), (2,1), (3,0), \
                     (0,2), (1,1), (2,0), \
                     (0,1), (1,0) ];
@@ -66,9 +66,9 @@ class AIPlayer(Player):
                         currentState.board[x][y].constr == True
                 moves.append(move)
             return moves
-        else:            
+        else:
             return None  #should never happen
-    
+
     ##
     #getMove
     #
@@ -80,6 +80,8 @@ class AIPlayer(Player):
         #Useful pointers
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
+
+        self.evaluateState(currentState)
 
         #the first time this method is called, the food and tunnel locations
         #need to be recorded in their respective instance variables
@@ -105,20 +107,50 @@ class AIPlayer(Player):
         myWorker = getAntList(currentState, me, (WORKER,))[0]
         if (myWorker.hasMoved):
             return Move(END, None, None)
-        
+
+        #if the queen is on the anthill move her
+        myQueen = myInv.getQueen()
+        if (myQueen.coords == myInv.getAnthill().coords):
+            return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
+
+        #if the hasn't moved, have her move in place so she will attack
+        if (not myQueen.hasMoved):
+            return Move(MOVE_ANT, [myQueen.coords], None)
+
+        #if I have the foos and the anthill is unoccupied then
+        #make a drone
+        if (myInv.foodCount > 2):
+            if (getAntAt(currentState, myInv.getAnthill().coords) is None):
+                return Move(BUILD, [myInv.getAnthill().coords], DRONE)
+
+        #Move all my drones towards the enemy
+        myDrones = getAntList(currentState, me, (DRONE,))
+        for drone in myDrones:
+            if not (drone.hasMoved):
+                droneX = drone.coords[0]
+                droneY = drone.coords[1]
+                if (droneY < 9):
+                    droneY += 1;
+                else:
+                    droneX += 1;
+                if (droneX,droneY) in listReachableAdjacent(currentState, drone.coords, 3):
+                    return Move(MOVE_ANT, [drone.coords, (droneX, droneY)], None)
+                else:
+                    return Move(MOVE_ANT, [drone.coords], None)
+
         #if the worker has food, move toward tunnel
         if (myWorker.carrying):
             path = createPathToward(currentState, myWorker.coords,
                                     self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
             return Move(MOVE_ANT, path, None)
-            
+
         #if the worker has no food, move toward food
         else:
             path = createPathToward(currentState, myWorker.coords,
                                     self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
             return Move(MOVE_ANT, path, None)
-                              
-    
+
+
     ##
     #getAttack
     #
@@ -126,7 +158,39 @@ class AIPlayer(Player):
     #
     def getAttack(self, currentState, attackingAnt, enemyLocations):
         return enemyLocations[0]  #don't care
-        
+
+    ##
+    #evaluateState
+    #
+    # This function behaves as the heuristic evaluation for various states the agent can enter
+    # returns a value from 0.0 - 1.0 to indicate how much of a "winning" move has been selected
+    #
+    # 0.0 means the enemy has won the game.
+    # > 0.5 means you are currently winning
+    #
+    # gets passed the current game state object.
+    #
+    def evaluateState(self, currentState):
+        #useful pointers.
+        moveScore = 0.0
+        me = currentState.whoseTurn
+        enemy = (currentState.whoseTurn + 1) % 2
+
+        #Metrics that are important to evaluate:
+        # number of ants each player has
+        myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
+        enemyAntCount = len(getAntList(currentState, enemy, (QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
+
+        # types of ants each player has. We assume that there's only one queen.
+        myWorkers = getAntList(currentState, me,(WORKER,))
+        myDrones = getAntList(currentState, me, (DRONE,))
+        mySoldiers = getAntList(currentState, me, (SOLDIER,))
+
+        myWorkers = getAntList(currentState, me,(WORKER,))
+        myDrones = getAntList(currentState, me, (DRONE,))
+        mySoldiers = getAntList(currentState, me, (SOLDIER,))
+
+        return moveScore
     ##
     #registerWin
     #
