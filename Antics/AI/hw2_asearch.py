@@ -112,7 +112,7 @@ class AIPlayer(Player):
     #
     def evaluateState(self, currentState):
         #useful pointers.
-        moveScore = 0.0
+        moveScore = 0.0 #convert this to a decimal at the end of execution when it returns
         me = currentState.whoseTurn
         enemy = (currentState.whoseTurn + 1) % 2
 
@@ -138,8 +138,10 @@ class AIPlayer(Player):
 
         if (len(myWorkers) < 1):
             moveScore -= 0.1
-        elif (len(myWorkers) < 4 && len(myWorkers) > 2):
+        elif (len(myWorkers) < 4 and len(myWorkers) > 2):
             moveScore += 0.1
+
+        #give points for building drones, soldiers, r soldiers
 
         enemyWorkers = getAntList(currentState, enemy,(WORKER,))
         enemyDrones = getAntList(currentState, enemy, (DRONE,))
@@ -147,7 +149,6 @@ class AIPlayer(Player):
         enemyRanged = getAntList(currentState, enemy, (R_SOLDIER,))
 
         # health of ants that each player has.
-        # just loop through each ant and access ant.health property
         # if an ant's health is not full, we can assume we are being threatened
         #full health we can assume that we are doing ok, and can up the move score.
         myTotalHealth = 0;
@@ -156,7 +157,8 @@ class AIPlayer(Player):
             if (ant.health != UNIT_STATS[ant.type][HEALTH]):
                 if (moveScore > 0.0):
                     moveScore -= 0.1
-            elif (moveScore < 1.0):
+            else:
+                if (moveScore < 1.0):
                     moveScore += 0.1
 
         enemyTotalHealth = 0;
@@ -168,12 +170,12 @@ class AIPlayer(Player):
 
         # How much food each player has
         myFood = myInv.foodCount
-        enemyFood = enemyInv.foodCount
+        #enemyFood = enemyInv.foodCount
 
         # how much food each player's workers are carrying.
         #if the food count == 11, we can set the move score to 1.0
         myCurrentFood = 0
-        for myCurrentFood, worker in myWorkers:
+        for worker in myWorkers:
             if (worker.carrying):
                 myCurrentFood+=1
 
@@ -182,7 +184,7 @@ class AIPlayer(Player):
 
 
         enemyCurrentFood = 0
-        for enemyCurrentFood, worker in enemyWorkers:
+        for worker in enemyWorkers:
             if (worker.carrying):
                 enemyCurrentFood+=1
 
@@ -191,8 +193,8 @@ class AIPlayer(Player):
         # how threatened are each players queens? (proximity to enemy)
         # If our queen is threatened the most, the movescore gets decrimented
         # if our enemy is, the move score would increase. ++ 0.1
-        myQueen = getAntList(currentState, me, (QUEEN,))
-        enemyQueen = getAntList(currentState, enemy, (QUEEN,))
+        myQueen = getAntList(currentState, me, (QUEEN,))[0]
+        enemyQueen = getAntList(currentState, enemy, (QUEEN,))[0]
 
         #get MY threat level
         if (self.threatToQueen(currentState, me, myQueen ) > 3):
@@ -203,11 +205,18 @@ class AIPlayer(Player):
         if (self.threatToQueen(currentState, enemy, enemyQueen) > 3):
             #we are threatening the enemy, good job
             if (moveScore < 1.0):
-                moveScore += 0.1
+                moveScore += 0.3
 
         # how well protected my anthill is.
         # count grass nodes and get their proximity to the anthill.
+        if (self.protectionLevel(currentState, me) < 3):
+            if (moveScore > 0.0):
+                moveScore -= 0.1
+        else:
+            if (moveScore < 1.0):
+                moveScore += 0.1
 
+        print moveScore
         return moveScore
 
     ##
@@ -228,14 +237,14 @@ class AIPlayer(Player):
         for ant in getAntList(currentState, playerId, (SOLDIER,DRONE)):
 
             #If my health is full and no enemies are within 2, decrease threat
-            if (queen.health == 8 && approxDist(ant.coords, queen.coords) > 2):
+            if (queen.health == 8 and approxDist(ant.coords, queen.coords) > 2):
                 if (threatLevel > 0):
                     threatLevel -= 1
             #elif i do not have full health, increase threat by 1.
-            elif (queen.health != 8 && approxDist(ant.coords, queen.coords) > 2):
+            elif (queen.health != 8 and approxDist(ant.coords, queen.coords) > 2):
                 threatLevel += 1
             #else there are enemies near. threat up by 1.
-            else
+            else:
                 threatLevel += 1
 
         return threatLevel
@@ -245,7 +254,12 @@ class AIPlayer(Player):
         grass = getConstrList(currentState, playerId, (GRASS,))
         anthill = getConstrList(currentState, playerId, (ANTHILL,))[0]
         for grassNode in grass:
-            dist = approxDist(grassNode.coords, )
+            dist = approxDist(grassNode.coords, anthill.coords)
+            if (dist > 3):
+                if (protectionLevel > 0):
+                    protectionLevel -=1
+            else:
+                protectionLevel +=1
         return protectionLevel
 
     ##
