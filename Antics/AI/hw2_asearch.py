@@ -184,18 +184,19 @@ class AIPlayer(Player):
 
         #Metrics that are important to evaluate:
         # number of ants each player has
-        myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
+        myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE)))
         enemyAntCount = len(getAntList(currentState, enemy, (QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
 
         # types of ants each player has. We assume that there's only one queen.
-        # would it be better to take all of the ants on each side and increment a count per the type?
+        # let's prioritize having more drones than anything else. At most 2 workers.
+        # don't worry about my soldiers/ranged. we arent going to build these.
         myWorkers = getAntList(currentState, me,(WORKER,))
         myDrones = getAntList(currentState, me, (DRONE,))
-        mySoldiers = getAntList(currentState, me, (SOLDIER,))
 
-        enemyWorkers = getAntList(currentState, me,(WORKER,))
-        enemyDrones = getAntList(currentState, me, (DRONE,))
-        enemySoldiers = getAntList(currentState, me, (SOLDIER,))
+        enemyWorkers = getAntList(currentState, enemy,(WORKER,))
+        enemyDrones = getAntList(currentState, enemy, (DRONE,))
+        enemySoldiers = getAntList(currentState, enemy, (SOLDIER,))
+        enemyRanged = getAntList(currentState, enemy, (R_SOLDIER,))
 
         # health of ants that each player has.
         # just loop through each ant and access ant.health property
@@ -207,23 +208,67 @@ class AIPlayer(Player):
         enemyFood = enemyInv.foodCount
 
         # how much food each player's workers are carrying.
-        i = 0
+        myCurrentFood = 0
         for i, worker in myWorkers:
             if (worker.carrying):
                 i+=1
-        j = 0
-        for j, worker in enemyWorkers:
+        enemyCurrentFood = 0
+        for enemyCurrentFood, worker in enemyWorkers:
             if (worker.carrying):
                 j+=1
 
         # how threatened are each players queens? (proximity to enemy)
         # If our queen is threatened the most, the movescore gets decrimented (if > 0.0)
         # if our enemy is, the move score would increase. ++ 0.1? (if< 1.0)
+        myQueen = getAntList(currentState, me, (QUEEN,))
+        enemyQueen = getAntList(currentState, enemy, (QUEEN,))
+
+        #get MY threat level
+        if (self.threatToQueen(currentState, me, myQueen ) > 2):
+            # only decrement the moveScore if we can. otherwise leave it as it is.
+            if (moveScore > 0.0):
+                moveScore -= 0.1
+        #get enemy threat level
+        if (self.threatToQueen(currentState, enemy, enemyQueen) > 2):
+            #we are threatening the enemy, good job
+            if (moveScore < 1.0):
+                moveScore += 0.1
 
         # how well protected my anthill is.
         # count grass nodes and get their proximity to the anthill.
 
         return moveScore
+
+    ##
+    # threatToQueen()
+    #
+    # takes the current state, queen ant, and looks for enemy ants
+    #
+    # The threat level increases by 1 the more enemies that are 1 move away.
+    # threat level increases if the queen's health is not full AND enemies are close
+    #
+    # Threat level decreases when there are no close enemies
+    #
+    #
+    def threatToQueen(self, currentState, playerId, queen):
+        threatLevel = 0
+        # eventually wrap this in big IF to make sure there are even these kinds of enemies
+        #find enemy ants, find their approximate distance from the queen.
+        for ant in getAntList(currentState, playerId, (SOLDIER,DRONE)):
+
+            #If my health is full and no enemies are within 2, decrease threat
+            if (queen.health == 8 && approxDist(ant.coords, queen.coords) > 2):
+                if (threatLevel > 0):
+                    threatLevel -= 1
+            #elif i do not have full health, increase threat by 1.
+            elif (queen.health != 8 && approxDist(ant.coords, queen.coords) > 2):
+                threatLevel += 1
+            #else there are enemies near. threat up by 1.
+            else
+                threatLevel += 1
+
+        return threatLevel
+
     ##
     #registerWin
     #
