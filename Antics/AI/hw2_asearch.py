@@ -77,78 +77,18 @@ class AIPlayer(Player):
     #
     ##
     def getMove(self, currentState):
-        #Useful pointers
-        myInv = getCurrPlayerInventory(currentState)
-        me = currentState.whoseTurn
 
         self.evaluateState(currentState)
 
-        #the first time this method is called, the food and tunnel locations
-        #need to be recorded in their respective instance variables
-        if (self.myTunnel == None):
-            self.myTunnel = getConstrList(currentState, me, (TUNNEL,))[0]
-        if (self.myFood == None):
-            foods = getConstrList(currentState, None, (FOOD,))
-            self.myFood = foods[0]
-            #find the food closest to the tunnel
-            bestDistSoFar = 1000 #i.e., infinity
-            for food in foods:
-                dist = stepsToReach(currentState, self.myTunnel.coords, food.coords)
-                if (dist < bestDistSoFar):
-                    self.myFood = food
-                    bestDistSoFar = dist
+        moves = listAllLegalMoves(currentState)
+        selectedMove = moves[random.randint(0,len(moves) - 1)];
 
-        #if I don't have a worker, give up.  QQ
-        numAnts = len(myInv.ants)
-        if (numAnts == 1):
-            return Move(END, None, None)
+        #don't do a build move if there are already 3+ ants
+        numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
+        while (selectedMove.moveType == BUILD and numAnts >= 3):
+            selectedMove = moves[random.randint(0,len(moves) - 1)];
 
-        #if the worker has already moved, we're done
-        myWorker = getAntList(currentState, me, (WORKER,))[0]
-        if (myWorker.hasMoved):
-            return Move(END, None, None)
-
-        #if the queen is on the anthill move her
-        myQueen = myInv.getQueen()
-        if (myQueen.coords == myInv.getAnthill().coords):
-            return Move(MOVE_ANT, [myInv.getQueen().coords, (1,0)], None)
-
-        #if the hasn't moved, have her move in place so she will attack
-        if (not myQueen.hasMoved):
-            return Move(MOVE_ANT, [myQueen.coords], None)
-
-        #if I have the foos and the anthill is unoccupied then
-        #make a drone
-        if (myInv.foodCount > 2):
-            if (getAntAt(currentState, myInv.getAnthill().coords) is None):
-                return Move(BUILD, [myInv.getAnthill().coords], DRONE)
-
-        #Move all my drones towards the enemy
-        myDrones = getAntList(currentState, me, (DRONE,))
-        for drone in myDrones:
-            if not (drone.hasMoved):
-                droneX = drone.coords[0]
-                droneY = drone.coords[1]
-                if (droneY < 9):
-                    droneY += 1;
-                else:
-                    droneX += 1;
-                if (droneX,droneY) in listReachableAdjacent(currentState, drone.coords, 3):
-                    return Move(MOVE_ANT, [drone.coords, (droneX, droneY)], None)
-                else:
-                    return Move(MOVE_ANT, [drone.coords], None)
-
-        #if the worker has food, move toward tunnel
-        if (myWorker.carrying):
-            path = createPathToward(currentState, myWorker.coords,
-                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
-            return Move(MOVE_ANT, path, None)
-
-        #if the worker has no food, move toward food
-        else:
-            path = createPathToward(currentState, myWorker.coords,
-                                    self.myFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-            return Move(MOVE_ANT, path, None)
+        return selectedMove
 
 
     ##
@@ -184,7 +124,9 @@ class AIPlayer(Player):
 
         #Metrics that are important to evaluate:
         # number of ants each player has
-        myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE)))
+        myAnts = getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER))
+        enemyAnts = getAntList(currentState, enemy,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER))
+        myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
         enemyAntCount = len(getAntList(currentState, enemy, (QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
 
         # types of ants each player has. We assume that there's only one queen.
@@ -192,6 +134,12 @@ class AIPlayer(Player):
         # don't worry about my soldiers/ranged. we arent going to build these.
         myWorkers = getAntList(currentState, me,(WORKER,))
         myDrones = getAntList(currentState, me, (DRONE,))
+        mySoldiers = getAntList(currentState, me, (SOLDIER,))
+
+        if (len(myWorkers) < 1):
+            moveScore -= 0.1
+        elif (len(myWorkers) < 4 && len(myWorkers) > 2):
+            moveScore += 0.1
 
         enemyWorkers = getAntList(currentState, enemy,(WORKER,))
         enemyDrones = getAntList(currentState, enemy, (DRONE,))
@@ -202,34 +150,57 @@ class AIPlayer(Player):
         # just loop through each ant and access ant.health property
         # if an ant's health is not full, we can assume we are being threatened
         #full health we can assume that we are doing ok, and can up the move score.
+        myTotalHealth = 0;
+        for ant in myAnts:
+            myTotalHealth += ant.health
+            if (ant.health != UNIT_STATS[ant.type][HEALTH]):
+                if (moveScore > 0.0):
+                    moveScore -= 0.1
+            elif (moveScore < 1.0):
+                    moveScore += 0.1
+
+        enemyTotalHealth = 0;
+        for ant in enemyAnts:
+            enemyTotalHealth += ant.health
+            if (ant.health != UNIT_STATS[ant.type][HEALTH]):
+                if (moveScore < 1.0):
+                    moveScore += 0.1
 
         # How much food each player has
         myFood = myInv.foodCount
         enemyFood = enemyInv.foodCount
 
         # how much food each player's workers are carrying.
+        #if the food count == 11, we can set the move score to 1.0
         myCurrentFood = 0
-        for i, worker in myWorkers:
+        for myCurrentFood, worker in myWorkers:
             if (worker.carrying):
-                i+=1
+                myCurrentFood+=1
+
+        if (myCurrentFood == 11):
+            moveScore = 1.0
+
+
         enemyCurrentFood = 0
         for enemyCurrentFood, worker in enemyWorkers:
             if (worker.carrying):
-                j+=1
+                enemyCurrentFood+=1
 
+        if(enemyCurrentFood == 11):
+            moveScore = 0.0
         # how threatened are each players queens? (proximity to enemy)
-        # If our queen is threatened the most, the movescore gets decrimented (if > 0.0)
-        # if our enemy is, the move score would increase. ++ 0.1? (if< 1.0)
+        # If our queen is threatened the most, the movescore gets decrimented
+        # if our enemy is, the move score would increase. ++ 0.1
         myQueen = getAntList(currentState, me, (QUEEN,))
         enemyQueen = getAntList(currentState, enemy, (QUEEN,))
 
         #get MY threat level
-        if (self.threatToQueen(currentState, me, myQueen ) > 2):
+        if (self.threatToQueen(currentState, me, myQueen ) > 3):
             # only decrement the moveScore if we can. otherwise leave it as it is.
             if (moveScore > 0.0):
                 moveScore -= 0.1
         #get enemy threat level
-        if (self.threatToQueen(currentState, enemy, enemyQueen) > 2):
+        if (self.threatToQueen(currentState, enemy, enemyQueen) > 3):
             #we are threatening the enemy, good job
             if (moveScore < 1.0):
                 moveScore += 0.1
@@ -268,6 +239,14 @@ class AIPlayer(Player):
                 threatLevel += 1
 
         return threatLevel
+
+    def protectionLevel(self, currentState, playerId):
+        protectionLevel = 0
+        grass = getConstrList(currentState, playerId, (GRASS,))
+        anthill = getConstrList(currentState, playerId, (ANTHILL,))[0]
+        for grassNode in grass:
+            dist = approxDist(grassNode.coords, )
+        return protectionLevel
 
     ##
     #registerWin
