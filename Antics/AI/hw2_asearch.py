@@ -112,15 +112,11 @@ class AIPlayer(Player):
     #
     def evaluateState(self, currentState):
         #useful pointers.
-        moveScore = 0.0 #convert this to a decimal at the end of execution when it returns
+        stateScore = 0.0
         me = currentState.whoseTurn
         enemy = (currentState.whoseTurn + 1) % 2
-
-        myInv = getCurrPlayerInventory(currentState)
-        enemyInv = []
-
-        if (myInv.player != me):
-            enemyInv = myInv
+        myInv = currentState.inventories[me]
+        enemyInv = currentState.inventories[not me]
 
         #Metrics that are important to evaluate:
         # number of ants each player has
@@ -129,19 +125,10 @@ class AIPlayer(Player):
         myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
         enemyAntCount = len(getAntList(currentState, enemy, (QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
 
-        # types of ants each player has. We assume that there's only one queen.
-        # let's prioritize having more drones than anything else. At most 2 workers.
-        # don't worry about my soldiers/ranged. we arent going to build these.
+        # types of ants each player has.
         myWorkers = getAntList(currentState, me,(WORKER,))
         myDrones = getAntList(currentState, me, (DRONE,))
         mySoldiers = getAntList(currentState, me, (SOLDIER,))
-
-        if (len(myWorkers) < 1):
-            moveScore -= 0.1
-        elif (len(myWorkers) < 4 and len(myWorkers) > 2):
-            moveScore += 0.1
-
-        #give points for building drones, soldiers, r soldiers
 
         enemyWorkers = getAntList(currentState, enemy,(WORKER,))
         enemyDrones = getAntList(currentState, enemy, (DRONE,))
@@ -149,75 +136,68 @@ class AIPlayer(Player):
         enemyRanged = getAntList(currentState, enemy, (R_SOLDIER,))
 
         # health of ants that each player has.
-        # if an ant's health is not full, we can assume we are being threatened
-        #full health we can assume that we are doing ok, and can up the move score.
-        myTotalHealth = 0;
-        for ant in myAnts:
-            myTotalHealth += ant.health
-            if (ant.health != UNIT_STATS[ant.type][HEALTH]):
-                if (moveScore > 0.0):
-                    moveScore -= 0.1
-            else:
-                if (moveScore < 1.0):
-                    moveScore += 0.1
-
-        enemyTotalHealth = 0;
-        for ant in enemyAnts:
-            enemyTotalHealth += ant.health
-            if (ant.health != UNIT_STATS[ant.type][HEALTH]):
-                if (moveScore < 1.0):
-                    moveScore += 0.1
+        # if an ant's health is not full, we can assume we are being threatened,
+        # return a lower state score as a result
+        # myTotalHealth = 0;
+        # for ant in myAnts:
+        #     myTotalHealth += ant.health
+        #     if (ant.health < UNIT_STATS[ant.type][HEALTH]):
+        #         print ant.type + "doesnt have full health"
+        #         stateScore = 0.4
+        #         return stateScore
 
         # How much food each player has
         myFood = myInv.foodCount
-        #enemyFood = enemyInv.foodCount
+        enemyFood = enemyInv.foodCount
+        foodDiff = myFood - enemyFood
 
-        # how much food each player's workers are carrying.
-        #if the food count == 11, we can set the move score to 1.0
+        #if the difference in food counts is great
+        if (foodDiff < 0):
+            stateScore = abs(foodDiff) / 10
+            return stateScore
+        elif (myFood > 0):
+            stateScore = foodDiff / 10
+            return stateScore
+
+        # how much food my workers are carrying.
         myCurrentFood = 0
         for worker in myWorkers:
             if (worker.carrying):
                 myCurrentFood+=1
 
-        if (myCurrentFood == 11):
-            moveScore = 1.0
+        if (myFood == 10):
+            stateScore = 1.0
+            return stateScore
+        if(enemyFood == 10):
+            stateScore = 0.0
+            return stateScore
 
-
-        enemyCurrentFood = 0
-        for worker in enemyWorkers:
-            if (worker.carrying):
-                enemyCurrentFood+=1
-
-        if(enemyCurrentFood == 11):
-            moveScore = 0.0
-        # how threatened are each players queens? (proximity to enemy)
-        # If our queen is threatened the most, the movescore gets decrimented
-        # if our enemy is, the move score would increase. ++ 0.1
+        # how threatened are each players queens?
+        # If our queen is threatened the most, the stateScore gets decrimented
+        # if our enemy is, the score would increase
         myQueen = getAntList(currentState, me, (QUEEN,))[0]
         enemyQueen = getAntList(currentState, enemy, (QUEEN,))[0]
 
-        #get MY threat level
-        if (self.threatToQueen(currentState, me, myQueen ) > 3):
-            # only decrement the moveScore if we can. otherwise leave it as it is.
-            if (moveScore > 0.0):
-                moveScore -= 0.1
-        #get enemy threat level
-        if (self.threatToQueen(currentState, enemy, enemyQueen) > 3):
-            #we are threatening the enemy, good job
-            if (moveScore < 1.0):
-                moveScore += 0.3
+        # #get MY threat level
+        # if (self.threatToQueen(currentState, me, myQueen ) > 3):
+        #     stateScore = 0.2
+        #     return stateScore
+        # # #get enemy threat level
+        # if (self.threatToQueen(currentState, enemy, enemyQueen) > 3):
+        #     #we are threatening the enemy, good job
+        #     stateScore = 0.7
+        #     return stateScore
 
-        # how well protected my anthill is.
-        # count grass nodes and get their proximity to the anthill.
-        if (self.protectionLevel(currentState, me) < 3):
-            if (moveScore > 0.0):
-                moveScore -= 0.1
-        else:
-            if (moveScore < 1.0):
-                moveScore += 0.1
+        # # how well protected my anthill is.
+        # # count grass nodes and get their proximity to the anthill.
+        # if (self.protectionLevel(currentState, me) < 3):
+        #     if (stateScore > 0):
+        #         stateScore -= 0.1
+        # else:
+        #     if (stateScore < 10):
+        #         stateScore += 0.1
 
-        print moveScore
-        return moveScore
+        return stateScore
 
     ##
     # threatToQueen()
@@ -259,7 +239,7 @@ class AIPlayer(Player):
                 if (protectionLevel > 0):
                     protectionLevel -=1
             else:
-                protectionLevel +=1
+                protectionLevel += 1
         return protectionLevel
 
     ##
