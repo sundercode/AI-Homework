@@ -34,6 +34,7 @@ class AIPlayer(Player):
         #variables (see getMove() below)
         self.myFood = None
         self.myTunnel = None
+        self.maxDepth = 1
 
     ##
     #getPlacement
@@ -77,16 +78,19 @@ class AIPlayer(Player):
     #
     ##
     def getMove(self, currentState):
-
         self.evaluateState(currentState)
 
-        moves = listAllLegalMoves(currentState)
-        selectedMove = moves[random.randint(0,len(moves) - 1)];
+        selectedMove = self.recursiveMove(currentState, self.maxDepth)
 
-        #don't do a build move if there are already 3+ ants
-        numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
-        while (selectedMove.moveType == BUILD and numAnts >= 3):
-            selectedMove = moves[random.randint(0,len(moves) - 1)];
+        #self.recursiveMove(currentState, 1)
+
+        # moves = listAllLegalMoves(currentState)
+        # selectedMove = moves[random.randint(0,len(moves) - 1)];
+        #
+        # #don't do a build move if there are already 3+ ants
+        # numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
+        # while (selectedMove.moveType == BUILD and numAnts >= 3):
+        #     selectedMove = moves[random.randint(0,len(moves) - 1)];
 
         return selectedMove
 
@@ -111,8 +115,8 @@ class AIPlayer(Player):
     # gets passed the current game state object.
     #
     def evaluateState(self, currentState):
-        #useful pointers.
-        stateScore = 0.0
+        #useful pointers. Set state score to a default value since we interpret 0 as losing.
+        stateScore = 0.5
         me = currentState.whoseTurn
         enemy = (currentState.whoseTurn + 1) % 2
         myInv = currentState.inventories[me]
@@ -127,24 +131,21 @@ class AIPlayer(Player):
 
         # types of ants each player has.
         myWorkers = getAntList(currentState, me,(WORKER,))
-        myDrones = getAntList(currentState, me, (DRONE,))
-        mySoldiers = getAntList(currentState, me, (SOLDIER,))
+
+        #more than 2 workers is good
+        if (len(myWorkers) >= 2 and len(myWorkers) < 4):
+            stateScore = 0.7
+            #print "I have 2+ workers"
+            #return stateScore
+        #less than 2 should indicate that the enemy has an advantage
+        elif (len(myWorkers) < 2):
+            stateScore = 0.4
+            #print "I have less than 2 workers"
+            #return stateScore
 
         enemyWorkers = getAntList(currentState, enemy,(WORKER,))
         enemyDrones = getAntList(currentState, enemy, (DRONE,))
         enemySoldiers = getAntList(currentState, enemy, (SOLDIER,))
-        enemyRanged = getAntList(currentState, enemy, (R_SOLDIER,))
-
-        # health of ants that each player has.
-        # if an ant's health is not full, we can assume we are being threatened,
-        # return a lower state score as a result
-        # myTotalHealth = 0;
-        # for ant in myAnts:
-        #     myTotalHealth += ant.health
-        #     if (ant.health < UNIT_STATS[ant.type][HEALTH]):
-        #         print ant.type + "doesnt have full health"
-        #         stateScore = 0.4
-        #         return stateScore
 
         # How much food each player has
         myFood = myInv.foodCount
@@ -153,11 +154,13 @@ class AIPlayer(Player):
 
         #if the difference in food counts is great
         if (foodDiff < 0):
-            stateScore = abs(foodDiff) / 10
-            return stateScore
-        elif (myFood > 0):
-            stateScore = foodDiff / 10
-            return stateScore
+            stateScore = 0.2
+            #print "The enemy has more food than me"
+            #return stateScore
+        elif (foodDiff > 0):
+            stateScore = 0.8
+            #print "I have more food than my enemy"
+            #return stateScore
 
         # how much food my workers are carrying.
         myCurrentFood = 0
@@ -165,6 +168,11 @@ class AIPlayer(Player):
             if (worker.carrying):
                 myCurrentFood+=1
 
+        if (myCurrentFood == len(myWorkers)):
+            stateScore = 0.8
+            #print "all of my workers are carrying food"
+            #return stateScore
+        #food metrics that determine a win/loss
         if (myFood == 10):
             stateScore = 1.0
             return stateScore
@@ -172,33 +180,45 @@ class AIPlayer(Player):
             stateScore = 0.0
             return stateScore
 
+        # give points if the workers are close to the tunnel/anthill with food
+        goodWorkers = 0
+        avg = 0
+        for worker in myWorkers:
+            if (worker.carrying and approxDist(worker.coords, myInv.getAnthill().coords) < 3):
+                goodWorkers += 1
+            elif (worker.carrying and approxDist(worker.coords, myInv.getTunnels()[0].coords) < 3):
+                goodWorkers += 1
+            elif (worker.carrying and approxDist(worker.coords, myInv.getAnthill().coords) > 3):
+                stateScore = 0.4 #not moving towards the anthill
+                #print "my workers are not moving to the anthill"
+                #return stateScore
+            elif (worker.carrying and approxDist(worker.coords, myInv.getTunnels()[0].coords) > 3):
+                stateScore = 0.4 #not moving towards the tunnel
+                #print "my workers are not moving to the tunnel"
+                #return stateScore
+        if (len(myWorkers) != 0):
+            avg = goodWorkers/len(myWorkers)
+            if (goodWorkers != 0 and avg != 0):
+                #print "we have ants moving towards tunnels: " + str(avg)
+                stateScore = avg
+            if (avg == 1.0):
+                stateScore = 0.9
+                #print "all my workers are moving to the tunnel"
+                #return stateScore
+        else: #my workers are dead
+            stateScore = 0.1
+            #print "I have no workers"
+
         # how threatened are each players queens?
-        # If our queen is threatened the most, the stateScore gets decrimented
-        # if our enemy is, the score would increase
         myQueen = getAntList(currentState, me, (QUEEN,))[0]
         enemyQueen = getAntList(currentState, enemy, (QUEEN,))[0]
 
         # #get MY threat level
-        # if (self.threatToQueen(currentState, me, myQueen ) > 3):
-        #     stateScore = 0.2
-        #     return stateScore
-        # # #get enemy threat level
-        # if (self.threatToQueen(currentState, enemy, enemyQueen) > 3):
-        #     #we are threatening the enemy, good job
-        #     stateScore = 0.7
-        #     return stateScore
+        self.threatToQueen(currentState, enemy, myQueen)
+        self.threatToQueen(currentState, me, myQueen)
 
-        # # how well protected my anthill is.
-        # # count grass nodes and get their proximity to the anthill.
-        # if (self.protectionLevel(currentState, me) < 3):
-        #     if (stateScore > 0):
-        #         stateScore -= 0.1
-        # else:
-        #     if (stateScore < 10):
-        #         stateScore += 0.1
-
+        self.protectionLevel(currentState, me)
         return stateScore
-
     ##
     # threatToQueen()
     #
@@ -209,26 +229,30 @@ class AIPlayer(Player):
     #
     # Threat level decreases when there are no close enemies
     #
-    #
     def threatToQueen(self, currentState, playerId, queen):
         threatLevel = 0
         # eventually wrap this in big IF to make sure there are even these kinds of enemies
         #find enemy ants, find their approximate distance from the queen.
         for ant in getAntList(currentState, playerId, (SOLDIER,DRONE)):
 
-            #If my health is full and no enemies are within 2, decrease threat
+            #If my health is full and no enemies are within 2, return 0
             if (queen.health == 8 and approxDist(ant.coords, queen.coords) > 2):
-                if (threatLevel > 0):
-                    threatLevel -= 1
+                threatLevel = 0
+                #print "no threat to queen found"
             #elif i do not have full health, increase threat by 1.
             elif (queen.health != 8 and approxDist(ant.coords, queen.coords) > 2):
+                print "my queen is being threatened"
                 threatLevel += 1
             #else there are enemies near. threat up by 1.
             else:
                 threatLevel += 1
-
         return threatLevel
-
+    ##
+    # protectionLevel
+    #
+    # looks at the grass constructions and how well they protect the anthill.
+    # returns an integer as a "protection score"
+    #
     def protectionLevel(self, currentState, playerId):
         protectionLevel = 0
         grass = getConstrList(currentState, playerId, (GRASS,))
@@ -237,15 +261,79 @@ class AIPlayer(Player):
             dist = approxDist(grassNode.coords, anthill.coords)
             if (dist > 3):
                 if (protectionLevel > 0):
+                    print "I am not very protected"
                     protectionLevel -=1
             else:
+                print "I am fairly protected"
                 protectionLevel += 1
         return protectionLevel
 
     ##
+    # bestNodeScore
+    #
+    # takes a list of state nodes and returns the best score
+    # the best score should help the choice of next state.
+    #
+    def bestNodeScore(self, nodeList):
+        #make a list of just the scores from the nodes
+        scoreList = [x["score"] for x in nodeList]
+
+        for score in scoreList:
+            if (max(scoreList) == score):
+                return score
+            else:
+                return max(scoreList)
+
+    def recursiveMove(self, currentState, currentDepth):
+        #generate list of all available moves
+        moveList = listAllMovementMoves(currentState)
+        if (len(moveList) < 1):
+            return None
+
+        nodeList = [dict({'move': None, 'nextState': None, 'score':None}) for x in range(len(moveList))]
+        for i, move in enumerate(moveList):
+            nodeList[i]['move'] = move
+            nodeList[i]['nextState'] = getNextState(currentState, move)
+            nodeList[i]['score'] = self.evaluateState(nodeList[i]['nextState'])
+
+        if (len(nodeList) == 0):
+            #if we can make no more moves, return an END_TURN move type
+            nodeList = [dict({'move': Move(END, None, None), 'nextState': None, 'score': None})]
+
+        #base case: return the state score
+        if (currentDepth > self.maxDepth):
+            return self.evaluateState(currentState)
+        #if we are at the head of the tree, return best scored node's move
+        elif (currentDepth == 0):
+            currScore = self.bestNodeScore(nodeList) #highest score
+            for node in nodeList:
+                #find the node with this score
+                if (node['score'] == currScore):
+                    return node['move']
+        #if we are somewhere in the middle of the tree, recurse
+        else:
+            #recursively call this on the state with the highest score
+            currScore = self.bestNodeScore(nodeList) #highest score
+            for node in nodeList:
+                #find the node with this score
+                if (node['score'] == currScore):
+                    return self.recursiveMove(node['nextState'], currentDepth + 1)
+
+
+    ##
+    # generateNode()
+    #
+    # takes the various parameters needed to create our state nodes and maps them
+    # to their correct dictionary keys. helper function to create a list of all nodes.
+    #
+    def generateNode(self, move, nextState, score, children):
+        currentNode = {"move": move, "next_state": nextState, "score": score}
+        return currentNode
+
+    ##
     #registerWin
     #
-    # This agent doens't learn
+    # This agent doesn't learn
     #
     def registerWin(self, hasWon):
         #method templaste, not implemented

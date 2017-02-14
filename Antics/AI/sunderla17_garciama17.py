@@ -99,7 +99,6 @@ class AIPlayer(Player):
     # This agent builds 3 workers, and soldiers as necessary if the opponent is mean
     ##
     def getMove(self, currentState):
-
         #Useful pointers
         myInv = getCurrPlayerInventory(currentState)
         me = currentState.whoseTurn
