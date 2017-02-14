@@ -29,7 +29,7 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "A* Search Copy")
+        super(AIPlayer,self).__init__(inputPlayerId, "A* Search")
         #the coordinates of the agent's food and tunnel will be stored in these
         #variables (see getMove() below)
         self.myFood = None
@@ -181,7 +181,6 @@ class AIPlayer(Player):
                 currentWorkerScore = (1.0/(bestDist+1.0)) * 0.5
                 workerScore += currentWorkerScore
 
-        #get the average worker score if we have more than one worker
         avgWorkerScore = workerScore/len(myWorkers)
 
         # move my queen off of the anthill
@@ -201,55 +200,6 @@ class AIPlayer(Player):
             stateScore += randFloat
         return stateScore
     ##
-    # threatToQueen()
-    #
-    # takes the current state, queen ant, and looks for enemy ants
-    #
-    # The threat level increases by 1 the more enemies that are 1 move away.
-    # threat level increases if the queen's health is not full AND enemies are close
-    #
-    # Threat level decreases when there are no close enemies
-    #
-    def threatToQueen(self, currentState, playerId, queen):
-        threatLevel = 0
-        # eventually wrap this in big IF to make sure there are even these kinds of enemies
-        #find enemy ants, find their approximate distance from the queen.
-        for ant in getAntList(currentState, playerId, (SOLDIER,DRONE)):
-
-            #If my health is full and no enemies are within 2, return 0
-            if (queen.health == 8 and approxDist(ant.coords, queen.coords) > 2):
-                threatLevel = 0
-                #print "no threat to queen found"
-            #elif i do not have full health, increase threat by 1.
-            elif (queen.health != 8 and approxDist(ant.coords, queen.coords) > 2):
-                print "my queen is being threatened"
-                threatLevel += 1
-            #else there are enemies near. threat up by 1.
-            else:
-                threatLevel += 1
-        return threatLevel
-    ##
-    # protectionLevel
-    #
-    # looks at the grass constructions and how well they protect the anthill.
-    # returns an integer as a "protection score"
-    #
-    def protectionLevel(self, currentState, playerId):
-        protectionLevel = 0
-        grass = getConstrList(currentState, playerId, (GRASS,))
-        anthill = getConstrList(currentState, playerId, (ANTHILL,))[0]
-        for grassNode in grass:
-            dist = approxDist(grassNode.coords, anthill.coords)
-            if (dist > 3):
-                if (protectionLevel > 0):
-                    print "I am not very protected"
-                    protectionLevel -=1
-            else:
-                print "I am fairly protected"
-                protectionLevel += 1
-        return protectionLevel
-
-    ##
     # bestNodeScore
     #
     # takes a list of state nodes and returns the best score
@@ -259,20 +209,31 @@ class AIPlayer(Player):
         #make a list of just the scores from the nodes
         scoreList = [x["score"] for x in nodeList]
 
+        #make sure list is non-empty
         for score in scoreList:
             if (max(scoreList) == score):
                 return score
             else:
                 return max(scoreList)
 
+    ##
+    # recursiveMove <!-- RECURSIVE -->
+    #
+    # This function generates our A* node tree to traverse.
+    #
+    # We recurse on the currentState object with the depth + 1
+    # State nodes are represented by a python Dictionary
+    #
     def recursiveMove(self, currentState, currentDepth):
-        #generate list of all available moves
+        #generate list of all available moves. Leave out END TURN moves as a part of this
         moveList = listAllMovementMoves(currentState)
         if (len(moveList) < 1):
             return None
 
+        #generate the list of all available nodes with a dictionary
         nodeList = [dict({'move': None, 'nextState': None, 'score':None}) for x in range(len(moveList))]
         for i, move in enumerate(moveList):
+            #populate the generated empty dicts with the right stats
             nodeList[i]['move'] = move
             nodeList[i]['nextState'] = getNextState(currentState, move)
             nodeList[i]['score'] = self.evaluateState(nodeList[i]['nextState'])
@@ -284,6 +245,7 @@ class AIPlayer(Player):
         #base case: return the state score
         if (currentDepth > self.maxDepth):
             return self.evaluateState(currentState)
+
         #if we are at the head of the tree, return best scored node's move
         elif (currentDepth == 0):
             currScore = self.bestNodeScore(nodeList) #highest score
@@ -291,7 +253,7 @@ class AIPlayer(Player):
                 #find the node with this score
                 if (node['score'] == currScore):
                     return node['move']
-        #if we are somewhere in the middle of the tree, recurse
+        #we are somewhere in the middle of the tree, recurse
         else:
             #recursively call this on the state with the highest score
             currScore = self.bestNodeScore(nodeList) #highest score
@@ -299,8 +261,6 @@ class AIPlayer(Player):
                 #find the node with this score
                 if (node['score'] == currScore):
                     return self.recursiveMove(node['nextState'], currentDepth + 1)
-
-
     ##
     #registerWin
     #
