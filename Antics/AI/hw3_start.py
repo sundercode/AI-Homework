@@ -34,7 +34,7 @@ class AIPlayer(Player):
         #variables (see getMove() below)
         self.myFood = None
         self.myTunnel = None
-        self.maxDepth = 2
+        self.maxDepth = 3
 
     ##
     #getPlacement
@@ -115,7 +115,7 @@ class AIPlayer(Player):
     #
     # TODO:: add more metrics to evaluate, like threat level and protection level to the
     # weighted value.
-    # WHOEVERS TURN IT IS MATTERS
+    # WHOEVERS TURN IT IS MATTERS: RETURN A MIN OR MAX SCORE BASED ON THAT FACT
     #
     def evaluateState(self, currentState):
         #useful pointers. Set state score to a default value since we interpret 0 as losing.
@@ -184,15 +184,19 @@ class AIPlayer(Player):
         # Calculate a score for the queen. Take into account the threat level
         myQueen = getAntList(currentState, me, (QUEEN,))[0]
         queenScore = 0
+
+        #get my queen off of the anthill
         stepsToAnthill = stepsToReach(currentState, myQueen.coords, myInv.getAnthill().coords)
         stepsToTunnel = stepsToReach(currentState, myQueen.coords, myInv.getTunnels()[0].coords)
         if (stepsToAnthill < 2 or stepsToTunnel < 2):
-            if (queenScore > 0.1):
+            if (queenScore > 0.2):
                 queenScore -= 0.2
         else:
+            # add threat level code here
             queenScore += 0.3
 
         #return the state score as a weighted average of the food and worker scores
+        # based on whose turn it is, return this as a positive or negative score.
         stateScore = (foodScore * 0.95)+(avgWorkerScore*0.08)+(queenScore* 0.2)
         if (stateScore < (1 - 0.0001)):
             stateScore += randFloat
@@ -205,8 +209,6 @@ class AIPlayer(Player):
     # The threat level increases by 1 the more enemies that are 1 move away.
     # threat level increases if the queen's health is not full AND enemies are close
     #
-    # Threat level decreases when there are no close enemies
-    #
     def threatToQueen(self, currentState, playerId, queen):
         threatLevel = 0
         # eventually wrap this in big IF to make sure there are even these kinds of enemies
@@ -216,36 +218,17 @@ class AIPlayer(Player):
             #If my health is full and no enemies are within 2, return 0
             if (queen.health == 8 and approxDist(ant.coords, queen.coords) > 2):
                 threatLevel = 0
-                #print "no threat to queen found"
+                return threatLevel
+
             #elif i do not have full health, increase threat by 1.
             elif (queen.health != 8 and approxDist(ant.coords, queen.coords) > 2):
-                print "my queen is being threatened"
                 threatLevel += 1
+
             #else there are enemies near. threat up by 1.
             else:
                 threatLevel += 1
-        return threatLevel
 
-    ##
-    # protectionLevel
-    #
-    # looks at the grass constructions and how well they protect the anthill.
-    # returns an integer as a "protection score"
-    #
-    def protectionLevel(self, currentState, playerId):
-        protectionLevel = 0
-        grass = getConstrList(currentState, playerId, (GRASS,))
-        anthill = getConstrList(currentState, playerId, (ANTHILL,))[0]
-        for grassNode in grass:
-            dist = approxDist(grassNode.coords, anthill.coords)
-            if (dist > 3):
-                if (protectionLevel > 0):
-                    print "I am not very protected"
-                    protectionLevel -=1
-            else:
-                print "I am fairly protected"
-                protectionLevel += 1
-        return protectionLevel
+        return threatLevel
 
     ##
     # bestNodeScore
@@ -253,16 +236,32 @@ class AIPlayer(Player):
     # takes a list of state nodes and returns the best score
     # the best score should help the choice of next state.
     #
+    # For HW 3, this takes the min or max score based on what players
+    # turn it is
+    #
     def bestNodeScore(self, nodeList):
+        #take player IDs into account
+        # me = currentState.whoseTurn
+        # enemy = (currentState.whoseTurn + 1) % 2
+
         #make a list of just the scores from the nodes
         scoreList = [x["score"] for x in nodeList]
 
-        #make sure list is non-empty
-        for score in scoreList:
-            if (max(scoreList) == score):
-                return score
-            else:
-                return max(scoreList)
+        return max(scoreList)
+
+    ##
+    # listAllRecursiveMoves
+    #
+    # Helper function for recursiveMove()
+    #
+    # makes a list of all the legal moves an agent can make, build and movement
+    # excludes END TURN moves.
+    #
+    def listAllRecursiveMoves(currentState):
+        result = []
+        result.extend(listAllMovementMoves(currentState))
+        result.extend(listAllBuildMoves(currentState))
+        return result
 
     ##
     # recursiveMove <!-- RECURSIVE -->
@@ -271,6 +270,8 @@ class AIPlayer(Player):
     #
     # We recurse on the currentState object with the depth + 1
     # State nodes are represented by a python Dictionary
+    #
+    # TODO:: modify this so that it takes the opponents moves into account
     #
     def recursiveMove(self, currentState, currentDepth):
         #generate list of all available moves. Leave out END TURN moves as a part of this
@@ -283,7 +284,7 @@ class AIPlayer(Player):
         for i, move in enumerate(moveList):
             #populate the generated empty dicts with the right stats
             nodeList[i]['move'] = move
-            nodeList[i]['nextState'] = getNextState(currentState, move)
+            nodeList[i]['nextState'] = getNextStateAdversarial(currentState, move)
             nodeList[i]['score'] = self.evaluateState(nodeList[i]['nextState'])
 
         if (len(nodeList) == 0):
@@ -292,6 +293,7 @@ class AIPlayer(Player):
 
         #base case: return the state score
         if (currentDepth > self.maxDepth):
+            #max agent will want the max score, while the min agent wants the lowest
             return self.evaluateState(currentState)
 
         #if we are at the head of the tree, return best scored node's move
