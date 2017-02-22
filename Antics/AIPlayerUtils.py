@@ -524,6 +524,30 @@ def getCurrPlayerQueen(currentState):
             break
     return queen
 
+
+##
+# Return: a list of the food objects on my side of the board
+def getCurrPlayerFood(self, currentState):
+    food = getConstrList(currentState, None, (FOOD,))
+    myFood = []
+    if (currentState.inventories[0].player == currentState.whoseTurn):
+        myFood.append(food[2])
+        myFood.append(food[3])
+    else:
+        myFood.append(food[0])
+        myFood.append(food[1])
+    return myFood
+
+ 
+
+##
+# Return: a reference to my enemy's inventory
+def getEnemyInv(self, currentState):
+    if (currentState.inventories[0].player == currentState.whoseTurn):
+        return currentState.inventories[1]
+    else:
+        return currentState.inventories[0]
+        
 ##
 # getNextState
 #
@@ -533,6 +557,10 @@ def getCurrPlayerQueen(currentState):
 # it to reflect what they would look like after a given move.  For efficiency,
 # only the inventories are modified and the board is set to None.  The original
 # (given) state is not modified.
+#
+# CAVEAT: To facilitate longer term analysis without having to take enemy moves
+# into consideration, MOVE_ANT commands do not cause the hasMoved property of
+# the ant to change to True.  Furthermore the END move type is ignored.
 #
 # Parameters:
 #   currentState - A clone of the current state (GameState)
@@ -622,6 +650,36 @@ def getNextState(currentState, move):
                             # If attacked an ant already don't attack any more
                             break
     return myGameState
+
+##
+# getNextStateAdversarial
+#
+# Description: This is the same as getNextState (above) except that it properly
+# updates the hasMoved property on ants and the END move is processed correctly.
+#
+# Parameters:
+#   currentState - A clone of the current state (GameState)
+#   move - The move that the agent would take (Move)
+#
+# Return: A clone of what the state would look like if the move was made
+##
+def getNextStateAdversarial(currentState, move):
+    # variables I will need
+    nextState = getNextState(currentState, move)
+    myInv = getCurrPlayerInventory(nextState)
+    myAnts = myInv.ants
+
+    # If an ant is moved update their coordinates and has moved
+    if move.moveType == MOVE_ANT:
+        startingCoord = move.coordList[0]
+        for ant in myAnts:
+            if ant.coords == startingCoord:
+                ant.hasMoved = True
+    elif move.moveType == END:
+        for ant in myAnts:
+            ant.hasMoved = False
+        nextState.whoseTurn = 1 - currentState.whoseTurn;
+    return nextState
 
     
 ##
