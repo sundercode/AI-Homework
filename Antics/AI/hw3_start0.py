@@ -29,7 +29,7 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "MiniMax Search")
+        super(AIPlayer,self).__init__(inputPlayerId, "MiniMax Search copy")
         #the coordinates of the agent's food and tunnel will be stored in these
         #variables (see getMove() below)
         self.myFood = None
@@ -90,8 +90,7 @@ class AIPlayer(Player):
     def getMove(self, currentState):
         self.evaluateState(currentState)
 
-        #recursively find moves, setting max to true
-        selectedMove = self.recursiveMove(currentState, 0, True)
+        selectedMove = self.recursiveMove(currentState, 0)
         if (selectedMove == None):
             return Move(END, None, None)
 
@@ -127,8 +126,16 @@ class AIPlayer(Player):
         randFloat = random.uniform(0.0, 0.0001)
 
         #Metrics that are important to evaluate:
+        # number of ants each player has
+        myAnts = getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER))
+        myAntCount = len(getAntList(currentState, me,(QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER)))
+
         # types of ants each player has. Right now we simply care about workers
         myWorkers = getAntList(currentState, me,(WORKER,))
+
+        #more than 2 workers is good
+        if (len(myWorkers) >= 2 and len(myWorkers) < 4):
+            stateScore = 0.9
 
         # How much food each player has
         publicFood = getConstrList(currentState, None, (FOOD,))
@@ -231,25 +238,15 @@ class AIPlayer(Player):
     # For HW 3, this takes the min or max score based on what players
     # turn it is
     #
-    def bestNodeScore(self, nodeList, currentState, playerId):
+    def bestNodeScore(self, nodeList):
         #take player IDs into account, take a min or max based on that fact
-        me = currentState.whoseTurn
-        enemy = (currentState.whoseTurn + 1) % 2
-
-        # bestScoreMax = 1.0
-        # bestScoreMin = 0.0
+        # me = currentState.whoseTurn
+        # enemy = (currentState.whoseTurn + 1) % 2
 
         #make a list of just the scores from the nodes
         scoreList = [x["score"] for x in nodeList]
 
-        if (playerId == me):
-            print "returning max"
-            return max(scoreList)
-            #return some sort of tuple?
-        else:
-            print "returning min"
-            return min(scoreList)
-            #return some sort of tuple?
+        return max(scoreList)
 
     ##
     # listAllRecursiveMoves
@@ -274,13 +271,9 @@ class AIPlayer(Player):
     # State nodes are represented by a python Dictionary
     #
     # TODO:: modify this so that it takes the opponents moves into account
-    # add a true/false flag for the max player
     #
-    def recursiveMove(self, currentState, currentDepth, max):
+    def recursiveMove(self, currentState, currentDepth):
         #generate list of all available moves. Leave out END TURN moves as a part of this
-        me = currentState.whoseTurn
-        enemy = (currentState.whoseTurn + 1) % 2
-
         moveList = listAllMovementMoves(currentState)
         if (len(moveList) < 1):
             return None
@@ -295,41 +288,32 @@ class AIPlayer(Player):
 
         if (len(nodeList) == 0):
             #if we can make no more moves, return an END_TURN move type
-            #max true/false flag?
             nodeList = [dict({'move': Move(END, None, None), 'nextState': None, 'score': None})]
 
-        #base case: return the state score, regardless of player
+        print currentState.whoseTurn
+        #base case: return the state score
         if (currentDepth > self.maxDepth):
+            #max agent will want the max score, while the min agent wants the lowest
+            #pruning here for later, what if we have a min node with 0.75?
+            #multiple nodes at the max depth? max true/false flag?
             return self.evaluateState(currentState)
-        #if we are at the head of the tree, return best scored node's move, we know depth 0 is max
-        #do we need this condition?
+
+        #if we are at the head of the tree, return best scored node's move, min or max
         elif (currentDepth == 0):
-            currScore = self.bestNodeScore(nodeList, currentState, me) #highest score, augmented with playerId soon
+            currScore = self.bestNodeScore(nodeList) #highest score
             for node in nodeList:
                 #find the node with this score
                 if (node['score'] == currScore):
                     return node['move']
 
         #we are somewhere in the middle of the tree, recurse
-        elif (max is True):
-            #if max is True, set the "best possible" to 0
-            bestScore = 0.0
-            print "we are making a max move"
-            currScore = self.bestNodeScore(nodeList, currentState, me) #highest score, with playerId
+        else:
+            #recursively call this on the state with the highest score
+            currScore = self.bestNodeScore(nodeList) #highest score
             for node in nodeList:
-                #find the node with this score, set the max flag to FALSE for next call
+                #find the node with this score
                 if (node['score'] == currScore):
-                    return self.recursiveMove(node['nextState'], currentDepth + 1, False)
-        else: #max is False
-            #so we set "best possible" to 1
-            #find "best score" from the min perspective
-            print "looking at the min perspective"
-            currScore = self.bestNodeScore(nodeList, currentState, enemy) #highest score, with playerId
-            for node in nodeList:
-                #find the node with this score, set the max flag to FALSE for next call
-                if (node['score'] == currScore):
-                    return self.recursiveMove(node['nextState'], currentDepth + 1, True)
-            #recursively call function, set max flag to TRUE for next iteration.
+                    return self.recursiveMove(node['nextState'], currentDepth + 1)
     ##
     #registerWin
     #
