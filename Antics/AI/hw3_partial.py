@@ -88,13 +88,12 @@ class AIPlayer(Player):
     # returns the selected move from that traversal
     ##
     def getMove(self, currentState):
-        self.evaluateState(currentState)
+        #self.evaluateState(currentState)
 
         #recursively find moves, setting max to true
-        selectedMove = self.recursiveMove(currentState, 0, True)
-        if (selectedMove == None):
-            return Move(END, None, None)
-
+        #this gets reset here everytime....
+        for x in range(-1, self.maxDepth):
+            selectedMove = self.recursiveMove(currentState, x+1, True)
         return selectedMove
 
 
@@ -243,11 +242,9 @@ class AIPlayer(Player):
         scoreList = [x["score"] for x in nodeList]
 
         if (playerId == me):
-            print "returning max"
             return max(scoreList)
             #return some sort of tuple?
         else:
-            print "returning min"
             return min(scoreList)
             #return some sort of tuple?
 
@@ -282,31 +279,34 @@ class AIPlayer(Player):
         enemy = (currentState.whoseTurn + 1) % 2
 
         moveList = listAllMovementMoves(currentState)
-        if (len(moveList) < 1):
-            return None
-
         #generate the list of all available nodes with a dictionary
         nodeList = [dict({'move': None, 'nextState': None, 'score':None}) for x in range(len(moveList))]
         for i, move in enumerate(moveList):
             #populate the generated empty dicts with the right stats
             nodeList[i]['move'] = move
-            nodeList[i]['nextState'] = getNextStateAdversarial(currentState, move) #this switches the state!
+            nodeList[i]['nextState'] = getNextStateAdversarial(currentState, move) #this switches the state?
             nodeList[i]['score'] = self.evaluateState(nodeList[i]['nextState'])
 
         if (len(nodeList) == 0):
             #if we can make no more moves, return an END_TURN move type
             #max true/false flag?
+            print "move length is 0"
             nodeList = [dict({'move': Move(END, None, None), 'nextState': None, 'score': None})]
 
+        print "our current depth is " + str(currentDepth)
         #base case: return the state score, regardless of player
-        if (currentDepth > self.maxDepth):
-            return self.evaluateState(currentState)
-        #if we are at the head of the tree, return best scored node's move, we know depth 0 is max
-        #do we need this condition?
+        if (currentDepth > self.maxDepth): #this state is never activated?
+            #append a new item to our dictionary and return it?
+            currScore = self.evaluateState(currentState)
+            for node in nodeList: #what if the score doesnt match?
+                if (node['score'] == currScore):
+                    return node['move']
+                else:
+                    return "we have no match"
+
         elif (currentDepth == 0):
-            currScore = self.bestNodeScore(nodeList, currentState, me) #highest score, augmented with playerId soon
-            for node in nodeList:
-                #find the node with this score
+            currScore = self.bestNodeScore(nodeList, currentState, me) #use evaluateState??
+            for node in nodeList: #what if the score doesnt match?
                 if (node['score'] == currScore):
                     return node['move']
 
@@ -316,15 +316,18 @@ class AIPlayer(Player):
             bestScore = 0.0
             print "we are making a max move"
             currScore = self.bestNodeScore(nodeList, currentState, me) #highest score, with playerId
+            #finalScore = max(bestScore, currScore)
             for node in nodeList:
                 #find the node with this score, set the max flag to FALSE for next call
                 if (node['score'] == currScore):
                     return self.recursiveMove(node['nextState'], currentDepth + 1, False)
         else: #max is False
             #so we set "best possible" to 1
+            bestScore = 1.0
             #find "best score" from the min perspective
             print "looking at the min perspective"
             currScore = self.bestNodeScore(nodeList, currentState, enemy) #highest score, with playerId
+            #finalScore = min(bestScore, currScore)
             for node in nodeList:
                 #find the node with this score, set the max flag to FALSE for next call
                 if (node['score'] == currScore):
