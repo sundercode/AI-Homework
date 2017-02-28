@@ -88,12 +88,8 @@ class AIPlayer(Player):
     # returns the selected move from that traversal
     ##
     def getMove(self, currentState):
-        self.evaluateState(currentState)
-
+        #make a move based on our recursive call
         selectedMove = self.recursiveMove(currentState, 0)
-        if (selectedMove == None):
-            return Move(END, None, None)
-
         return selectedMove
 
 
@@ -238,29 +234,20 @@ class AIPlayer(Player):
     # For HW 3, this takes the min or max score based on what players
     # turn it is
     #
-    def bestNodeScore(self, nodeList):
+    def bestNodeScore(self, nodeList, currentState, playerId):
         #take player IDs into account, take a min or max based on that fact
-        # me = currentState.whoseTurn
-        # enemy = (currentState.whoseTurn + 1) % 2
+        me = currentState.whoseTurn ## should be 1
+        enemy = (currentState.whoseTurn + 1) % 2 ##should be 0
 
         #make a list of just the scores from the nodes
         scoreList = [x["score"] for x in nodeList]
 
-        return max(scoreList)
-
-    ##
-    # listAllRecursiveMoves
-    #
-    # Helper function for recursiveMove()
-    #
-    # makes a list of all the legal moves an agent can make, build and movement
-    # excludes END TURN moves.
-    #
-    def listAllRecursiveMoves(currentState):
-        result = []
-        result.extend(listAllMovementMoves(currentState))
-        result.extend(listAllBuildMoves(currentState))
-        return result
+        if (playerId == me):
+            return max(scoreList)
+            #return some sort of tuple?
+        else:
+            return min(scoreList)
+            #return some sort of tuple?
 
     ##
     # recursiveMove <!-- RECURSIVE -->
@@ -273,10 +260,12 @@ class AIPlayer(Player):
     # TODO:: modify this so that it takes the opponents moves into account
     #
     def recursiveMove(self, currentState, currentDepth):
+
+        me = currentState.whoseTurn ## should be 1
+        enemy = (currentState.whoseTurn + 1) % 2 ##should be 0
+
         #generate list of all available moves. Leave out END TURN moves as a part of this
         moveList = listAllMovementMoves(currentState)
-        if (len(moveList) < 1):
-            return None
 
         #generate the list of all available nodes with a dictionary
         nodeList = [dict({'move': None, 'nextState': None, 'score':None}) for x in range(len(moveList))]
@@ -289,31 +278,30 @@ class AIPlayer(Player):
         if (len(nodeList) == 0):
             #if we can make no more moves, return an END_TURN move type
             nodeList = [dict({'move': Move(END, None, None), 'nextState': None, 'score': None})]
+            #could call here with max == false, since that's the only time it gets set
+            return nodeList[0]['move']
 
-        print currentState.whoseTurn
         #base case: return the state score
-        if (currentDepth > self.maxDepth):
+        if (currentDepth >= self.maxDepth):
             #max agent will want the max score, while the min agent wants the lowest
-            #pruning here for later, what if we have a min node with 0.75?
-            #multiple nodes at the max depth? max true/false flag?
             return self.evaluateState(currentState)
 
         #if we are at the head of the tree, return best scored node's move, min or max
         elif (currentDepth == 0):
-            currScore = self.bestNodeScore(nodeList) #highest score
+            currScore = self.bestNodeScore(nodeList, currentState, me) #highest score, we should only do this to prune?
             for node in nodeList:
-                #find the node with this score
+                #find the node with this score, this does dfs by default i think
                 if (node['score'] == currScore):
                     return node['move']
 
         #we are somewhere in the middle of the tree, recurse
-        else:
-            #recursively call this on the state with the highest score
-            currScore = self.bestNodeScore(nodeList) #highest score
-            for node in nodeList:
-                #find the node with this score
-                if (node['score'] == currScore):
-                    return self.recursiveMove(node['nextState'], currentDepth + 1)
+        # else:
+        #     #recursively call this on the state with the highest score
+        #     currScore = self.bestNodeScore(nodeList) #highest score
+        #     for node in nodeList:
+        #         #find the node with this score
+        #         if (node['score'] == currScore):
+        #             return self.recursiveMove(node['nextState'], currentDepth + 1)
     ##
     #registerWin
     #
