@@ -24,9 +24,17 @@ must meet the core criteria (below). The design of this agent is totally up to
 you.
 
 #Homework 2
-Informed Search Agent
+Informed Search Agent - A* Search
 
 ##Description
 Your assignment is to create an Antics agent that performs a multi-level, heuristically guided
-search of the Antics state space.
+search of the Antics state space. This agent evaluates a given state, gives it a score, and then
+traverses the state tree based on the best available score that it has.
+
+#Homework 3
+MiniMax Search
+
+##Description
+Expands upon the agent from HW2 and adds a minimax style scoring. This agent also utilizes alpha-beta
+pruning to help cut down on resource usage.
 
