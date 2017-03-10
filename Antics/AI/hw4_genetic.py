@@ -120,7 +120,6 @@ class AIPlayer(Player):
     #Return: The coordinates of where the construction is to be placed
     ##
     def getPlacement(self, currentState):
-        print "placing new items"
         numToPlace = 0
         self.cState = currentState
         #implemented by students to return their next move
@@ -197,7 +196,7 @@ class AIPlayer(Player):
 
         #if we've reached our game limit for this gene, move to the next one
         if (self.gamesPlayed == self.NUM_GAMES):
-            print self.popFitness[self.geneIndex]
+            print str(self.popFitness[self.geneIndex]) + "is the score for this gene"
             if (self.popFitness[self.geneIndex] > self.bestScore):
                 self.bestScore = self.popFitness[self.geneIndex]
                 self.bestState = self.cState
