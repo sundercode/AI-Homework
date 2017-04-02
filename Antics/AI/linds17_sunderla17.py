@@ -196,7 +196,7 @@ class AIPlayer(Player):
 
         #if we've reached our game limit for this gene, move to the next one
         if (self.gamesPlayed == self.NUM_GAMES):
-            print str(self.popFitness[self.geneIndex]) + "is the score for this gene"
+            print str(self.popFitness[self.geneIndex]) + " is the score for this gene"
             if (self.popFitness[self.geneIndex] > self.bestScore):
                 self.bestScore = self.popFitness[self.geneIndex]
                 self.bestState = self.cState
@@ -209,8 +209,11 @@ class AIPlayer(Player):
             #output the best state to a file.
             if (self.bestState == None):
                 self.bestState = self.cState
+
+            #redirect stdout to make sure we can print the ascii print state to
+            # a file, then set it back to original to log to the console
             original = sys.stdout
-            sys.stdout = open('evidence382017.txt', 'a')
+            sys.stdout = open('evidence3102017.txt', 'a')
             asciiPrintState(self.bestState)
             sys.stdout = original
 
@@ -287,8 +290,6 @@ class AIPlayer(Player):
 
             if(childA[11] == childA[12] or childB[11] == childB[12]):
                 conflicts = True
-                # childA = []
-                # childB = []
 
         #Mutation
         if(random.randrange(100) < self.MUTATION_CHANCE):
@@ -314,5 +315,4 @@ class AIPlayer(Player):
 
         children.append(childA)
         children.append(childB)
-        print children
         return children
