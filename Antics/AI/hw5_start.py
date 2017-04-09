@@ -32,8 +32,11 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Neural Networks")
         #the coordinates of the agent's food and tunnel will be stored in these
-        self.targets = []
-        self.inputs = []
+        self.inputs = np.array([[0,0,1,0,1,1,0,1,0,0,0,0,0,1],
+                [0,1,1,0,1,1,0,1,0,0,0,0,0,1],
+                [1,1,1,0,1,1,0,0,0,0,0,0,0,0],
+                [1,0,1,0,1,1,0,1,1,0,0,0,0,0],])
+        self.targets = np.array([[0.512, 0.2345, 0.7880, 0.4372]]).T
         self.maxDepth = 2;
 
     ##
@@ -89,6 +92,7 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
         self.evaluateState(currentState)
+        self.backPropigate()
 
         selectedMove = self.recursiveMove(currentState, 0)
         if (selectedMove == None):
@@ -105,24 +109,24 @@ class AIPlayer(Player):
     def backPropigate(self):
         #seed random numbers for deterministic training?
         np.random.seed(1)
-
         #initialize random weights on all of our inputs, average is 0
-        syn0 = 2*np.random.random((3,1)) - 1
-
+        syn0 = 2*np.random.random((14,1)) - 1
         for iter in xrange(10):
-
             #forward propogation
             l0 = self.inputs ## this is currently empty, generated from our mapping function
             l1 = self.nonlin(np.dot(l0, syn0)) #should generate output?
 
             #error
-            l1_error = targets - l1 #remember 1 output per 14 inputs
+            l1_error = self.targets - l1 #remember 1 output per 14 inputs
 
-            #delta values
-            l1_delta = l1_error * nonlin(l1,True)
+            #delta values ---> apply a new learning rate to mess with this?
+            l1_delta = l1_error * self.nonlin(l1,True)
+            print str(l1_delta) + " is our delta"
 
             #update weights ----> to be hardcoded later?
             syn0 += np.dot(l0.T,l1_delta)
+        print "Outputs after training: "
+        print l1
 
     ##
     #getAttack
@@ -179,7 +183,7 @@ class AIPlayer(Player):
         #definite lose state
         if(enemyFood == 10):
             stateScore = 0.0
-            self.targets.append(stateScore)
+            #self.targets.append(stateScore)
             return stateScore
 
         # give points if the workers are close to the tunnel/anthill with food
@@ -187,7 +191,7 @@ class AIPlayer(Player):
         workerScore = 0
         if (len(myWorkers) == 0):
             stateScore = 0.1 #all of my workers are dead
-            self.targets.append(stateScore)
+            #self.targets.append(stateScore)
             return stateScore
 
         for worker in myWorkers:
@@ -229,7 +233,7 @@ class AIPlayer(Player):
             stateScore += randFloat
 
         ##add this score to a list of "test scores" for our neural network to learn from
-        self.targets.append(stateScore)
+        #self.targets.append(stateScore)
         return stateScore
     ##
     # bestNodeScore
