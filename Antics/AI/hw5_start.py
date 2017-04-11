@@ -32,11 +32,10 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Neural Networks")
         #the coordinates of the agent's food and tunnel will be stored in these
-        self.inputs = np.array([[0,0,1,0,1,1,0,1,0,0,0,0,0,1],
-                [0,1,1,0,1,1,0,1,0,0,0,0,0,1],
-                [1,1,1,0,1,1,0,0,0,0,0,0,0,0],
-                [1,0,1,0,1,1,0,1,1,0,0,0,0,0],])
-        #self.targets = np.array([[0.512, 0.2345, 0.7880, 0.4372]]).T
+        self.inputs = []
+        self.targets = []
+        self.hiddenNodes = [0]*20
+        self.learningRate = 0.20
         self.maxDepth = 2
 
     ##
@@ -106,27 +105,58 @@ class AIPlayer(Player):
             return x*(1-x)
         return 1/(1+np.exp(-x))
 
+    def hiddenAddition(self):
+        #initialize random weights on all of our inputs, used 76 for inputs + biases + hidden nodes
+        weights = [0]*20
+        for w in range(len(weights)):
+            randFloat = random.uniform(-1, 1)
+            weights[w] = randFloat
+        #generate a running sum for each hidden node we come to
+        #[a*b for a,b in zip(lista,listb)]
+
     def backPropigate(self):
-        #seed random numbers for deterministic training?
-        np.random.seed(1)
-        #initialize random weights on all of our inputs, average is 0
-        syn0 = 2*np.random.random((14,1)) - 1
-        for iter in xrange(10):
+        pairArray = zip(self.inputs, self.targets)
+        finalInput = np.array(self.inputs)
+        finalTargets = np.array([x[1] for x in pairArray])
+
+        print len(finalInput)
+        print len(finalTargets)
+        #let's associate each input with one target
+        inputLayerSize = 28
+        hiddenLayerSize = 20
+        outputLayerSize = 1
+
+        weights_hidden = np.random.uniform(-1, 1, size=(inputLayerSize, hiddenLayerSize))
+        weights_output = np.random.uniform(-1, 1, size=(hiddenLayerSize, outputLayerSize))
+        #print len(pairArray)
+
+        print len(weights_output)
+        print len(weights_hidden)
+
+        #print weights
+        for iter in xrange(60000):
             #forward propogation
-            l0 = self.inputs ## this is currently empty, generated from our mapping function
-            l1 = self.nonlin(np.dot(l0, syn0)) #should generate output?
+            l1 = self.nonlin(np.dot(finalInput, weights_hidden))
+            l2 = self.nonlin(np.dot(l1,weights_output))
 
-            #error
-            l1_error = self.targets - l1 #remember 1 output per 14 inputs
+            # how much did we miss the target value?
+            l2_error = finalTargets - l2
 
-            #delta values ---> apply a new learning rate to mess with this?
-            l1_delta = l1_error * self.nonlin(l1,True)
-            print str(l1_delta) + " is our delta"
+            if (iter% 10000) == 0:
+                print "Error:" + str(np.mean(np.abs(l2_error)))
 
-            #update weights ----> to be hardcoded later?
-            syn0 += np.dot(l0.T,l1_delta)
-        print "Outputs after training: "
-        print l1
+            # were we really sure? if so, don't change too much.
+            l2_delta = l2_error*self.nonlin(l2,deriv=True)
+
+            # how much did each l1 value contribute to the l2 error (according to the weights)?
+            l1_error = l2_delta.dot(weights_output.T)
+
+            # were we really sure? if so, don't change too much.
+            l1_delta = l1_error * self.nonlin(l1,deriv=True)
+
+            #update the weights
+            weights_output += l1.T.dot(l2_delta)
+            weights_hidden += finalInput.T.dot(l1_delta)
 
     ##
     #getAttack
@@ -139,7 +169,8 @@ class AIPlayer(Player):
     def mapping(self, currentState):
         #Currently has 27 inputs. This might change with
         #Things that want to be added or the biases
-        input = np.zeros(27)
+        #input = np.zeros(28)
+        input = [0]*28
         me = currentState.whoseTurn
         enemy = (currentState.whoseTurn + 1) % 2
         myInv = currentState.inventories[me]
@@ -157,62 +188,61 @@ class AIPlayer(Player):
         if(myFood == 1):
             input[1] = 1
             input[0] = 0
-            for x in range(1,11):
+            for x in range(2,11):
                 input[x] = 0
         if(myFood == 2):
             input[2] = 1
             for x in range(1):
                 input[x] = 0
-            for x in range(2,11):
+            for x in range(3,11):
                 input[x] = 0
         if(myFood == 3):
             input[3] = 1
             for x in range(2):
                 input[x] = 0
-            for x in range(3,11):
+            for x in range(4,11):
                 input[x] = 0
         if(myFood == 4):
             input[4] = 1
             for x in range(3):
                 input[x] = 0
-            for x in range(4,11):
+            for x in range(5,11):
                 input[x] = 0
         if(myFood == 5):
             input[5] = 1
             for x in range(4):
                 input[x] = 0
-            for x in range(5,11):
+            for x in range(6,11):
                 input[x] = 0
         if(myFood == 6):
             input[6] = 1
             for x in range(5):
                 input[x] = 0
-            for x in range(6,11):
+            for x in range(7,11):
                 input[x] = 0
         if(myFood == 7):
             input[7] = 1
             for x in range(6):
                 input[x] = 0
-            for x in range(7,11):
+            for x in range(8,11):
                 input[x] = 0
         if(myFood == 8):
             input[8] = 1
             for x in range(7):
                 input[x] = 0
-            for x in range(8,11):
+            for x in range(9,11):
                 input[x] = 0
         if(myFood == 9):
             input[9] = 1
             for x in range(8):
                 input[x] = 0
-            for x in range(9,11):
+            for x in range(10,11):
                 input[x] = 0
         if(myFood == 10):
             input[10] = 1
             for x in range(9):
                 input[x] = 0
-            for x in range(10,11):
-                input[x] = 0
+            input[11] = 0
         if(myFood == 11):
             input[11] = 1
             for x in range(10):
@@ -221,71 +251,69 @@ class AIPlayer(Player):
         #Same as above, just with enemy food. Increasing negative weight
         if(enemyFood == 0):
             input[12] = 1
-            for x in range(12,23):
+            for x in range(13,23):
                 input[x] = 0
         if(enemyFood == 1):
             input[13] = 1
-            for x in range(11,12):
-                input[x] = 0
-            for x in range(13,23):
+            input[12] = 0
+            for x in range(14,23):
                 input[x] = 0
         if(enemyFood == 2):
             input[14] = 1
-            for x in range(11,13):
-                input[x] = 0
-            for x in range(14,23):
-                input[x] = 0
-        if(enemyFood == 3):
-            input[15] = 1
-            for x in range(11,14):
+            for x in range(12,13):
                 input[x] = 0
             for x in range(15,23):
                 input[x] = 0
-        if(enemyFood == 4):
-            input[16] = 1
-            for x in range(11,15):
+        if(enemyFood == 3):
+            input[15] = 1
+            for x in range(12,14):
                 input[x] = 0
             for x in range(16,23):
                 input[x] = 0
-        if(enemyFood == 5):
-            input[17] = 1
-            for x in range(11,16):
+        if(enemyFood == 4):
+            input[16] = 1
+            for x in range(12,15):
                 input[x] = 0
             for x in range(17,23):
                 input[x] = 0
-        if(enemyFood == 6):
-            input[18] = 1
-            for x in range(11,17):
+        if(enemyFood == 5):
+            input[17] = 1
+            for x in range(12,16):
                 input[x] = 0
             for x in range(18,23):
                 input[x] = 0
-        if(enemyFood == 7):
-            input[19] = 1
-            for x in range(11,18):
+        if(enemyFood == 6):
+            input[18] = 1
+            for x in range(12,17):
                 input[x] = 0
             for x in range(19,23):
                 input[x] = 0
-        if(enemyFood == 8):
-            input[20] = 1
-            for x in range(11,19):
+        if(enemyFood == 7):
+            input[19] = 1
+            for x in range(12,18):
                 input[x] = 0
             for x in range(20,23):
                 input[x] = 0
-        if(enemyFood == 9):
-            input[21] = 1
-            for x in range(11,20):
+        if(enemyFood == 8):
+            input[20] = 1
+            for x in range(12,19):
                 input[x] = 0
             for x in range(21,23):
                 input[x] = 0
-        if(enemyFood == 10):
-            input[22] = 1
-            for x in range(11,21):
+        if(enemyFood == 9):
+            input[21] = 1
+            for x in range(12,20):
                 input[x] = 0
             for x in range(22,23):
                 input[x] = 0
+        if(enemyFood == 10):
+            input[22] = 1
+            for x in range(12,21):
+                input[x] = 0
+            input[23] = 0
         if(enemyFood == 11):
             input[23] = 1
-            for x in range(11,22):
+            for x in range(12,22):
                 input[x] = 0
 
         myWorkers = getAntList(currentState, me,(WORKER,))
@@ -308,8 +336,6 @@ class AIPlayer(Player):
             else:
                 input[26] = 0
 
-
-
         myQueen = getAntList(currentState, me, (QUEEN,))[0]
         stepsToAnthill = stepsToReach(currentState, myQueen.coords, myInv.getAnthill().coords)
         stepsToTunnel = stepsToReach(currentState, myQueen.coords, myInv.getTunnels()[0].coords)
@@ -319,8 +345,7 @@ class AIPlayer(Player):
             input[27] = 0
 
         self.inputs.append(input)
-        print input
-
+        #print input
     ##
     #evaluateState
     #
@@ -418,7 +443,7 @@ class AIPlayer(Player):
             stateScore += randFloat
 
         ##add this score to a list of "test scores" for our neural network to learn from
-        #self.targets.append(stateScore)
+        self.targets.append([stateScore])
         return stateScore
     ##
     # bestNodeScore
@@ -490,4 +515,6 @@ class AIPlayer(Player):
     def registerWin(self, hasWon):
         if hasWon:
             print "we won!!"
+        self.backPropigate()
+        self.hiddenAddition()
         return hasWon
