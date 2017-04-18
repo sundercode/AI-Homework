@@ -35,8 +35,12 @@ class AIPlayer(Player):
         self.inputs = []
         self.targets = []
         self.hiddenNodes = [0]*20
-        self.learningRate = 0.20
+        self.learningRate = 0.10
         self.maxDepth = 2
+
+        self.learnedHiddenWeights = []
+        self.learnedOutputWeights = []
+        self.learnedScores = []
 
     ##
     #getPlacement
@@ -105,36 +109,32 @@ class AIPlayer(Player):
             return x*(1-x)
         return 1/(1+np.exp(-x))
 
-    def hiddenAddition(self):
-        #initialize random weights on all of our inputs, used 76 for inputs + biases + hidden nodes
-        weights = [0]*20
-        for w in range(len(weights)):
-            randFloat = random.uniform(-1, 1)
-            weights[w] = randFloat
-        #generate a running sum for each hidden node we come to
-        #[a*b for a,b in zip(lista,listb)]
-
+    ##
+    # our back propigation function that takes and learns on a set of inputs from the game.
+    #
+    # from: http://python3.codes/neural-network-python-part-1-sigmoid-function-gradient-descent-backpropagation/
+    #
+    # This simulates a run of 60000 learnings from a single game using back propigation.
+    # As this code is turned in, it has not been implemented to learn in antics w/o the evaluate state.
+    #
     def backPropigate(self):
         pairArray = zip(self.inputs, self.targets)
         finalInput = np.array(self.inputs)
         finalTargets = np.array([x[1] for x in pairArray])
 
         print len(finalInput)
-        print len(finalTargets)
+        print len(pairArray)
         #let's associate each input with one target
         inputLayerSize = 28
-        hiddenLayerSize = 20
+        hiddenLayerSize = 15
         outputLayerSize = 1
 
-        weights_hidden = np.random.uniform(-1, 1, size=(inputLayerSize, hiddenLayerSize))
-        weights_output = np.random.uniform(-1, 1, size=(hiddenLayerSize, outputLayerSize))
-        #print len(pairArray)
-
-        print len(weights_output)
-        print len(weights_hidden)
+        weights_hidden = np.random.uniform(low=-1.0, high=1.0, size=(inputLayerSize, hiddenLayerSize))
+        weights_output = np.random.uniform(low=-1.0, high=1.0, size=(hiddenLayerSize, outputLayerSize))
 
         #print weights
         for iter in xrange(60000):
+
             #forward propogation
             l1 = self.nonlin(np.dot(finalInput, weights_hidden))
             l2 = self.nonlin(np.dot(l1,weights_output))
@@ -142,11 +142,12 @@ class AIPlayer(Player):
             # how much did we miss the target value?
             l2_error = finalTargets - l2
 
-            if (iter% 10000) == 0:
-                print "Error:" + str(np.mean(np.abs(l2_error)))
-
             # were we really sure? if so, don't change too much.
             l2_delta = l2_error*self.nonlin(l2,deriv=True)
+
+            if (iter% 10000) == 0:
+                print "Error:" + str(np.mean(np.abs(l2_error)))
+                print l2_delta.shape
 
             # how much did each l1 value contribute to the l2 error (according to the weights)?
             l1_error = l2_delta.dot(weights_output.T)
@@ -155,8 +156,13 @@ class AIPlayer(Player):
             l1_delta = l1_error * self.nonlin(l1,deriv=True)
 
             #update the weights
-            weights_output += l1.T.dot(l2_delta)
-            weights_hidden += finalInput.T.dot(l1_delta)
+            weights_output += (l1.T.dot(l2_delta))*self.learningRate
+            weights_hidden += (finalInput.T.dot(l1_delta))*self.learningRate
+
+        #print l2
+        self.learnedOutputWeights = weights_output
+        self.learnedHiddenWeights = weights_hidden
+        self.learnedScores = l2
 
     ##
     #getAttack
@@ -166,10 +172,10 @@ class AIPlayer(Player):
     def getAttack(self, currentState, attackingAnt, enemyLocations):
         return enemyLocations[0]  #don't care
 
+
     def mapping(self, currentState):
         #Currently has 27 inputs. This might change with
         #Things that want to be added or the biases
-        #input = np.zeros(28)
         input = [0]*28
         me = currentState.whoseTurn
         enemy = (currentState.whoseTurn + 1) % 2
@@ -516,5 +522,4 @@ class AIPlayer(Player):
         if hasWon:
             print "we won!!"
         self.backPropigate()
-        self.hiddenAddition()
         return hasWon
