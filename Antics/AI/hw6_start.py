@@ -12,8 +12,8 @@ from AIPlayerUtils import *
 ##
 #AIPlayer
 #Description: The responsbility of this class is to interact with the game by
-#deciding a valid move based on a given game state. This class has methods that
-#will be implemented by students in Dr. Nuxoll's AI course.
+#deciding a valid move based on a given game state. This class will implement
+# a combination of various TD learning methods.
 #
 #Variables:
 #   playerId - The id of the player.
@@ -29,7 +29,8 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "TD Learning Agent")
         self.foodStates = 11*[None] # 11 different states for food
-        self.testList = [10, 23, 34920, 3949, 12, 11111, 234]
+
+        #policy: always take food whenever we can
 
     ##
     #getPlacement
@@ -136,17 +137,28 @@ class AIPlayer(Player):
                 print "x is the same as the food count, " + str(myInv.foodCount)
 
         #build upon food states with where ants are?
-    #Write save method to save current state-utility list to a file
+
+    ##
+    # saveUtilList
+    # save method to save current state-utility list to a file
+    #
+    # takes our utlity list and saves it to a hardcoded file name.
+    #
     def saveUtilList(self, utilList):
-        myFile = open('utilList418.txt', 'w')
+        myFile = open('sunderla17TD.txt', 'w')
 
         for item in utilList:
             myFile.write("%s\n" % item)
 
         myFile.close()
 
-    #Write load method to load state-utility list from a file, the
-    # one named in the save method
+    ##
+    # loadUtilList
+    # load method to load state-utility list from a file
+    #
+    # takes our utility list that we've saved in the folder and loads it into
+    # this instance of the TD learning.
+    #
     def loadUtilList(self, fname):
         with open(fname) as f:
             content = f.readlines()
@@ -163,7 +175,6 @@ class AIPlayer(Player):
     def registerWin(self, hasWon):
         if hasWon:
             print "we won!!"
-            print self.testList
             #self.saveUtilList(self.testList)
-            print self.loadUtilList('utilList418.txt')
+            #self.loadUtilList('sunderla17TD.txt')
         return hasWon
