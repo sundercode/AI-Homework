@@ -28,7 +28,7 @@ class AIPlayer(Player):
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "TD Learning Agent")
-        self.foodStates = 11*[None]
+        self.foodStates = 11*[None] # 11 different states for food
 
     ##
     #getPlacement
@@ -88,6 +88,7 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
         moves = listAllLegalMoves(currentState)
+        self.consolidateStates(currentState)
         selectedMove = moves[random.randint(0,len(moves) - 1)];
 
         #don't do a build move if there are already 3+ ants
@@ -125,33 +126,10 @@ class AIPlayer(Player):
         myInv = currentState.inventories[me]
         currWorkers = getAntList(currentState, me, (WORKER,))
         #look at this current state and see if all workers are carrying?
-        for worker in currWorkers:
-            carryCount = 0
-            if worker.carrying:
-                carryCount += 1
-
-        if (carryCount == len(currWorkers)):
-            #return the state
-            return currentState # save this to an instance variable?
 
         #food count, aka no matter where the ants are located the # of food is the main factor in states
-        foodCount = myInv.foodCount
-
         #we sould only change this if the food count changes
-        for x in range(foodCount):
-            self.foodStates[x] = currentState
-
-        #return a state for each #?
-        for x in range(foodCount):
-            if(x == foodCount)
-
-        #new state if the queen is either on or off of the anthill.
-        myQueen = getAntList(currentState, me, (QUEEN,))[0]
-        stepsToAnthill = stepsToReach(currentState, myQueen.coords, myInv.getAnthill().coords)
-        stepsToTunnel = stepsToReach(currentState, myQueen.coords, myInv.getTunnels()[0].coords)
-
-        if (stepsToTunnel >= 2 or stepsToAnthill >=2):
-            #this is a good state that might show up a lot. save it
-            return currentState
-
-        return currentState
+        for x in range(11):
+            if (myInv.foodCount == x):
+                self.foodStates[x] = currentState
+                print "x is the same as the food count, " + str(myInv.foodCount)
