@@ -29,6 +29,7 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "TD Learning Agent")
         self.foodStates = 11*[None] # 11 different states for food
+        self.testList = [10, 23, 34920, 3949, 12, 11111, 234]
 
     ##
     #getPlacement
@@ -133,3 +134,36 @@ class AIPlayer(Player):
             if (myInv.foodCount == x):
                 self.foodStates[x] = currentState
                 print "x is the same as the food count, " + str(myInv.foodCount)
+
+        #build upon food states with where ants are?
+    #Write save method to save current state-utility list to a file
+    def saveUtilList(self, utilList):
+        myFile = open('utilList418.txt', 'w')
+
+        for item in utilList:
+            myFile.write("%s\n" % item)
+
+        myFile.close()
+
+    #Write load method to load state-utility list from a file, the
+    # one named in the save method
+    def loadUtilList(self, fname):
+        with open(fname) as f:
+            content = f.readlines()
+            # you may also want to remove whitespace characters like `\n` at the end of each line
+            content = [int(x.strip('\n')) for x in content]
+
+            return content
+
+    ##
+    #registerWin
+    #
+    # This agent does learn, we should let it know when it wins
+    #
+    def registerWin(self, hasWon):
+        if hasWon:
+            print "we won!!"
+            print self.testList
+            #self.saveUtilList(self.testList)
+            print self.loadUtilList('utilList418.txt')
+        return hasWon
