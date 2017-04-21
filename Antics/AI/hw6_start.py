@@ -7,22 +7,7 @@ from Construction import CONSTR_STATS
 from Ant import UNIT_STATS
 from Move import Move
 from GameState import *
-from ConsolidatedState import *
 from AIPlayerUtils import *
-
-##
-# ConsolidatedState
-#
-# class that defines a simpler game state for antics with much less information
-# This class should just focus on food-related things
-#
-class ConsolidatedState(object):
-    def __init__(self, inputUtility, inputState):
-        self.utility = inputUtility
-        self.state = inputState
-
-    def setUtility(self, utility):
-        pass #method template, declare instance to override??
 
 ##
 #AIPlayer
@@ -45,7 +30,7 @@ class AIPlayer(Player):
         super(AIPlayer,self).__init__(inputPlayerId, "HW 6 TD Learning Agent")
         self.discountFactor = 0.92 #start with this and adjust
         self.learningRate = 0.99 #start with this and *0.90 each iteration
-        self.utilityList = [] #initialize for now, change later
+        self.utilityList = [] #initialize for now, change later, we want this to be (consolidatedState, utility)
         #policy: always take food whenever we can
 
     ##
@@ -106,13 +91,15 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
         moves = listAllLegalMoves(currentState)
-        self.getReward(currentState)
-        selectedMove = moves[random.randint(0,len(moves) - 1)];
+        selectedMove = moves[random.randint(0,len(moves) - 1)]
+
+        self.shrinkState(currentState)
+        #append state utilities to an array, initialized as the reward for each of the states?
 
         #don't do a build move if there are already 3+ ants
         numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
         while (selectedMove.moveType == BUILD and numAnts >= 3):
-            selectedMove = moves[random.randint(0,len(moves) - 1)];
+            selectedMove = moves[random.randint(0,len(moves) - 1)]
 
         return selectedMove
 
@@ -138,24 +125,36 @@ class AIPlayer(Player):
     # Parameters: the current state of the game.
     #
     # Return: the consolidated version of the current state we are passed
-    def consolidateStates(self, currentState):
+    def shrinkState(self, currentState):
         me = currentState.whoseTurn
         myInv = currentState.inventories[me]
         currWorkers = getAntList(currentState, me, (WORKER,))
+        stepsToAnthill = 0
+        stepsToTunnel = 0
+
+        for worker in currWorkers: #if we have more than one this is not going to really get accurate readings
+            stepsToAnthill = stepsToReach(currentState, worker.coords, myInv.getAnthill().coords)
+            stepsToTunnel = stepsToReach(currentState, worker.coords, myInv.getTunnels()[0].coords)
 
         #get the right params that we want to take into account and then return them here,
-        #give the state a utility??
-        #return ConsolidatedState()
+        #(self, inputUtility, inputFood, inputTunnelDist, inputHillDist, inputAnts):
+        newState = ConsolidatedState(0.455, myInv.foodCount, stepsToTunnel, stepsToAnthill, currWorkers) #init the new object here
+        print newState.tunnelDist
+        return newState
 
+    def learningRateMod(self, constant):
+        if (constant < 1.0):
+            return constant * constant #incrementally lower
     ##
     # getReward()
     #
     # Description: this function will take a gameState object and in turn generate a reward for it
-    # 1 = we have collected food, -1 we have lost, -0.01 is every other state we encounter on the way.
+    # 1 = we have collected food or returned to a structure with food, -1 we have lost or have no workers/more than one worker
+    # -0.01 is every other state we encounter on the way.
     #
     # Return: the reward for that given state
     def getReward(self, currentState):
-        runningReward = 0 #the best reward we have seen so far?
+        # runningReward = 0 #the best reward we have seen so far?
         currReward = -0.01 #the current reward we are looking at... potentially move this to instance variables
 
         me = currentState.whoseTurn
@@ -181,11 +180,25 @@ class AIPlayer(Player):
         if (enemyInv.foodCount == 11):
             currReward = -1.0
 
-        if (len(currWorkers) == 0):
+        if (len(currWorkers) != 1 ): #we only want this to learn that one worker is good
             currReward = -1.0
+        else:
+            currReward = -0.01 #"less bad" approach
 
         print str(currReward) + " is the reward"
         return currReward
+
+    ##
+    # getUtility
+    #
+    # calculates the utility of a given state given the use of the TD learning equation
+    #
+    # returns a utility number
+    def getUtility(self, currentState):
+        #initialize the utilities with the rewards when they are first seen
+
+        #after a transition, update the current utility we have been keeping track of
+        return 12
 
     ##
     # saveUtilList
@@ -223,8 +236,33 @@ class AIPlayer(Player):
     #
     def registerWin(self, hasWon):
         # print self.getReward(currentState)
+        #self.saveUtilList(self.testList) --> at the end of a game, save the current state-utility list
         if hasWon:
             print "we won!!"
-            #self.saveUtilList(self.testList)
             #self.loadUtilList('sunderla17TD.txt')
         return hasWon
+
+##
+# ConsolidatedState
+#
+# class that defines a simpler game state for antics with much less information
+# This class should just focus on food-related things
+#
+class ConsolidatedState(object):
+    def __init__(self, inputUtility, inputFood, inputTunnelDist, inputHillDist, inputAnts):
+        self.utility = inputUtility
+        # self.state = inputState #have the class convert a full state?
+        self.foodTotal = inputFood
+        self.tunnelDist = inputTunnelDist
+        self.hillDist = inputHillDist
+        self.ants = inputAnts
+        #food count, worker count, inventories, queen ants.
+
+    def learnUtility(self, currUtility):
+        # nextState =
+        #learningRateMod(learningRate) #shrink over time
+        #the utility would be calculated in the AI player class
+        return currUtility
+
+    def getNextState(self, currentState, move):
+        pass
