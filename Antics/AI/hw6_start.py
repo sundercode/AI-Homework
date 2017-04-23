@@ -1,5 +1,6 @@
 import random
 import sys
+import os.path
 sys.path.append("..")  #so other modules can be found in parent dir
 from Player import *
 from Constants import *
@@ -31,7 +32,9 @@ class AIPlayer(Player):
         self.discountFactor = 0.92 #start with this and adjust
         self.learningRate = 0.99 #start with this and *0.90 each iteration
         self.utilityList = [] #initialize for now, change later, we want this to be (consolidatedState, utility)
-        #policy: always take food whenever we can
+        self.gameCount = 0 #count how many games we've played
+        self.loadedList = []
+        print "in the init method!"
 
     ##
     #getPlacement
@@ -63,6 +66,8 @@ class AIPlayer(Player):
                 moves.append(move)
             return moves
         elif currentState.phase == SETUP_PHASE_2:   #stuff on foe's side
+            self.loadedList = self.loadUtilList('sunderla17TD.txt')
+
             numToPlace = 2
             moves = []
             for i in range(0, numToPlace):
@@ -93,7 +98,13 @@ class AIPlayer(Player):
         moves = listAllLegalMoves(currentState)
         selectedMove = moves[random.randint(0,len(moves) - 1)]
 
-        self.shrinkState(currentState)
+        # self.shrinkState(currentState) #save this to an instance variable?
+        # print self.loadedList
+        self.tdLearningEq(currentState)
+
+
+        #self.getReward(currentState)
+        #self.getUtility(currentState)
         #append state utilities to an array, initialized as the reward for each of the states?
 
         #don't do a build move if there are already 3+ ants
@@ -136,10 +147,9 @@ class AIPlayer(Player):
             stepsToAnthill = stepsToReach(currentState, worker.coords, myInv.getAnthill().coords)
             stepsToTunnel = stepsToReach(currentState, worker.coords, myInv.getTunnels()[0].coords)
 
-        #get the right params that we want to take into account and then return them here,
-        #(self, inputUtility, inputFood, inputTunnelDist, inputHillDist, inputAnts):
-        newState = ConsolidatedState(0.455, myInv.foodCount, stepsToTunnel, stepsToAnthill, currWorkers) #init the new object here
-        print newState.tunnelDist
+        #get the right params
+        newState = ConsolidatedState(self.getReward(currentState), myInv.foodCount, stepsToTunnel, stepsToAnthill, currWorkers) #init the new object here
+        self.utilityList.append(newState.utility)
         return newState
 
     def learningRateMod(self, constant):
@@ -154,8 +164,8 @@ class AIPlayer(Player):
     #
     # Return: the reward for that given state
     def getReward(self, currentState):
-        # runningReward = 0 #the best reward we have seen so far?
-        currReward = -0.01 #the current reward we are looking at... potentially move this to instance variables
+        #runningReward = 0 #the best reward we have seen so far?
+        currReward = 0 #the current reward we are looking at... potentially move this to instance variables
 
         me = currentState.whoseTurn
         enemyInv = currentState.inventories[not me]
@@ -166,39 +176,68 @@ class AIPlayer(Player):
         #when a worker ant is on a food location, give that a 1.0 value
         for worker in currWorkers:
             if (worker.coords == publicFood[0].coords or worker.coords == publicFood[1].coords):
-                currReward = 1.0
+                currReward += 1.0
                 #runningReward += currReward
 
         #when a worker is carrying and is on a tunnel or anthill, give this a 1.0 value
         for worker in currWorkers:
             if (worker.carrying):
                 if (worker.coords == myInv.getAnthill().coords or worker.coords == myInv.getTunnels()[0].coords):
-                    currReward = 1.0
+                    currReward += 1.0
                     #runningReward += currReward
 
         #else just return -1, because we are somewhere in between these states
         if (enemyInv.foodCount == 11):
-            currReward = -1.0
+            #subtract by food amount that enemy has?
+            currReward += -1.0
+            #runningReward += currReward
 
         if (len(currWorkers) != 1 ): #we only want this to learn that one worker is good
-            currReward = -1.0
+            currReward += -1.0
+            #runningReward += currReward
         else:
-            currReward = -0.01 #"less bad" approach
+            currReward += -0.01 #"less bad" approach
+            #runningReward += currReward
 
-        print str(currReward) + " is the reward"
+        #print str(currReward) + " is the reward"
         return currReward
 
     ##
-    # getUtility
+    # tdLearningEq
     #
     # calculates the utility of a given state given the use of the TD learning equation
     #
     # returns a utility number
-    def getUtility(self, currentState):
-        #initialize the utilities with the rewards when they are first seen
+    def tdLearningEq(self, currentState):
+        #initialize the utility with the rewards when they are first seen
+        s1 = self.shrinkState(currentState)
+        newUtility = 0
+        moveList = listAllMovementMoves(currentState)
+        nextStateList = []
+        #all the possible next states here, use consolidated
+        for move in moveList:
+            nextStateList.append(getNextState(currentState, move))
+        nextStateList = list(map(self.shrinkState, nextStateList))
 
-        #after a transition, update the current utility we have been keeping track of
-        return 12
+        #make sure the list isnt empty
+        if (len(nextStateList) == 0):
+            return s1.utility
+
+        ##RECURSION: base case: a terminal state. Return the utility of this state
+        #Terminal state is when there's a win condition met move
+
+        ##ELSE: after a transition, update the current utility we have been keeping track of
+        print self.learningRate
+        newUtility = s1.utility + (self.learningRate*(self.getReward(currentState) + self.discountFactor*nextStateList[0].utility - s1.utility))
+        #shrink the learning rate
+        self.learningRate *= self.learningRate
+        print str(self.learningRate) + " after changing the learning rate"
+
+        #tdLearningEq(self, next state????)
+
+        #this might be where we append utility values to save to a file
+        #self.utilityList.append(s1.utility)
+        return newUtility
 
     ##
     # saveUtilList
@@ -222,10 +261,13 @@ class AIPlayer(Player):
     # this instance of the TD learning.
     #
     def loadUtilList(self, fname):
+        #check if the file exists
+    # if (os.path.isfile('./sunderla17TD.txt')):
+    #     print "our file exists"
         with open(fname) as f:
             content = f.readlines()
             # you may also want to remove whitespace characters like `\n` at the end of each line
-            content = [int(x.strip('\n')) for x in content]
+            content = [x.strip('\n') for x in content]
 
             return content
 
@@ -235,12 +277,13 @@ class AIPlayer(Player):
     # This agent does learn, we should let it know when it wins
     #
     def registerWin(self, hasWon):
-        # print self.getReward(currentState)
-        #self.saveUtilList(self.testList) --> at the end of a game, save the current state-utility list
+        #print self.utilityList
+        self.saveUtilList(self.utilityList) #at the end of a game, save the current state-utility list
+        self.gameCount += 1
         if hasWon:
             print "we won!!"
-            #self.loadUtilList('sunderla17TD.txt')
         return hasWon
+
 
 ##
 # ConsolidatedState
