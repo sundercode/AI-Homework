@@ -1,5 +1,6 @@
 import random
 import sys
+import math
 import os.path
 sys.path.append("..")  #so other modules can be found in parent dir
 from Player import *
@@ -95,22 +96,16 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
-        moves = listAllLegalMoves(currentState)
-        selectedMove = moves[random.randint(0,len(moves) - 1)]
+        #moves = listAllLegalMoves(currentState)
+        selectedMove = self.tdLearningEq(currentState)
 
-        # self.shrinkState(currentState) #save this to an instance variable?
-        # print self.loadedList
-        self.tdLearningEq(currentState)
-
-
-        #self.getReward(currentState)
-        #self.getUtility(currentState)
-        #append state utilities to an array, initialized as the reward for each of the states?
+        #initialize the utility with the rewards when they are first seen
+        #self.shrinkState(currentState)
 
         #don't do a build move if there are already 3+ ants
-        numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
-        while (selectedMove.moveType == BUILD and numAnts >= 3):
-            selectedMove = moves[random.randint(0,len(moves) - 1)]
+        # numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
+        # while (selectedMove.moveType == BUILD and numAnts >= 3):
+        #     selectedMove = moves[random.randint(0,len(moves) - 1)]
 
         return selectedMove
 
@@ -149,7 +144,7 @@ class AIPlayer(Player):
 
         #get the right params
         newState = ConsolidatedState(self.getReward(currentState), myInv.foodCount, stepsToTunnel, stepsToAnthill, currWorkers) #init the new object here
-        self.utilityList.append(newState.utility)
+
         return newState
 
     def learningRateMod(self, constant):
@@ -209,35 +204,45 @@ class AIPlayer(Player):
     #
     # returns a utility number
     def tdLearningEq(self, currentState):
-        #initialize the utility with the rewards when they are first seen
+        # #initialize the utility with the rewards when they are first seen
         s1 = self.shrinkState(currentState)
         newUtility = 0
         moveList = listAllMovementMoves(currentState)
         nextStateList = []
+
         #all the possible next states here, use consolidated
         for move in moveList:
             nextStateList.append(getNextState(currentState, move))
+
         nextStateList = list(map(self.shrinkState, nextStateList))
 
-        #make sure the list isnt empty
+        #base case: a terminal state. Return the utility of this state
+        #Terminal state is when there's no more moves
         if (len(nextStateList) == 0):
-            return s1.utility
-
-        ##RECURSION: base case: a terminal state. Return the utility of this state
-        #Terminal state is when there's a win condition met move
+            return Move(END, None, None)
 
         ##ELSE: after a transition, update the current utility we have been keeping track of
-        print self.learningRate
-        newUtility = s1.utility + (self.learningRate*(self.getReward(currentState) + self.discountFactor*nextStateList[0].utility - s1.utility))
-        #shrink the learning rate
-        self.learningRate *= self.learningRate
-        print str(self.learningRate) + " after changing the learning rate"
+        #tdLearningEq(nextStateList[i+1].utility)
+        newUtilList = []
+        for i in range(len(nextStateList)):
+            nextStateList[i].utility = self.loadedList[i]
+            newUtility = s1.utility + (self.learningRate*(self.getReward(currentState) + self.discountFactor*nextStateList[i].utility - s1.utility))
+            newUtilList.append(newUtility)
 
-        #tdLearningEq(self, next state????)
+        #get the max utility
+        finalUtility = max(newUtilList)
+        #find the index that we found it
+        bestIndex = newUtilList.index(finalUtility)
 
         #this might be where we append utility values to save to a file
-        #self.utilityList.append(s1.utility)
-        return newUtility
+        s1.utility = finalUtility
+        #find the index of the best utility in the next states, and return the move associated with it
+
+        self.utilityList.append(s1.utility)
+        #return the move with that best index!
+        #return finalUtility
+        return moveList[bestIndex]
+
 
     ##
     # saveUtilList
@@ -267,7 +272,7 @@ class AIPlayer(Player):
         with open(fname) as f:
             content = f.readlines()
             # you may also want to remove whitespace characters like `\n` at the end of each line
-            content = [x.strip('\n') for x in content]
+            content = [float(x.strip('\n')) for x in content]
 
             return content
 
@@ -280,10 +285,13 @@ class AIPlayer(Player):
         #print self.utilityList
         self.saveUtilList(self.utilityList) #at the end of a game, save the current state-utility list
         self.gameCount += 1
+
+        if self.learningRate >= 0.01 and self.learningRate < 1.0:
+            self.learningRate = 0.99/math.sqrt(self.gameCount)
+            print str(self.learningRate) + " after changing the learning rate"
         if hasWon:
             print "we won!!"
         return hasWon
-
 
 ##
 # ConsolidatedState
@@ -299,6 +307,7 @@ class ConsolidatedState(object):
         self.tunnelDist = inputTunnelDist
         self.hillDist = inputHillDist
         self.ants = inputAnts
+        # self.move = inputMove
         #food count, worker count, inventories, queen ants.
 
     def learnUtility(self, currUtility):
