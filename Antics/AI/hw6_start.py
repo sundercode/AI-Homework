@@ -67,7 +67,9 @@ class AIPlayer(Player):
                 moves.append(move)
             return moves
         elif currentState.phase == SETUP_PHASE_2:   #stuff on foe's side
-            self.loadedList = self.loadUtilList('sunderla17TD.txt')
+            print self.gameCount
+            if self.gameCount >= 1:
+                self.loadedList = self.loadUtilList('sunderla17TD.txt')
 
             numToPlace = 2
             moves = []
@@ -100,7 +102,7 @@ class AIPlayer(Player):
         selectedMove = self.tdLearningEq(currentState)
 
         #initialize the utility with the rewards when they are first seen
-        #self.shrinkState(currentState)
+        print self.getReward(currentState)
 
         #don't do a build move if there are already 3+ ants
         # numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
@@ -167,25 +169,30 @@ class AIPlayer(Player):
         myInv = currentState.inventories[me]
         currWorkers = getAntList(currentState, me, (WORKER,))
         publicFood = getConstrList(currentState, None, (FOOD,))
+        myQueen = getAntList(currentState, me, (QUEEN,))[0]
 
-        #when a worker ant is on a food location, give that a 1.0 value
         for worker in currWorkers:
-            if (worker.coords == publicFood[0].coords or worker.coords == publicFood[1].coords):
-                currReward += 1.0
-                #runningReward += currReward
+            distToFood1 = approxDist(worker.coords, publicFood[0].coords)
+            distToFood2 = approxDist(worker.coords, publicFood[1].coords)
+            currReward -= min(distToFood1,distToFood2)* 0.01
 
         #when a worker is carrying and is on a tunnel or anthill, give this a 1.0 value
         for worker in currWorkers:
             if (worker.carrying):
-                if (worker.coords == myInv.getAnthill().coords or worker.coords == myInv.getTunnels()[0].coords):
-                    currReward += 1.0
-                    #runningReward += currReward
+                stepsToAnthill = approxDist(worker.coords, myInv.getAnthill().coords)
+                stepsToTunnel = approxDist(worker.coords, myInv.getTunnels()[0].coords)
+                currReward -= min(stepsToTunnel, stepsToAnthill)*0.01
+
+        if (myQueen.coords != myInv.getAnthill().coords or myQueen.coords != myInv.getTunnels()[0].coords):
+            currReward += 0.01
 
         #else just return -1, because we are somewhere in between these states
-        if (enemyInv.foodCount == 11):
-            #subtract by food amount that enemy has?
-            currReward += -1.0
-            #runningReward += currReward
+        foodDiff = myInv.foodCount - enemyInv.foodCount
+        #subtract by food amount that enemy has
+        currReward += 0.01*foodDiff
+
+        foodDiff2 = 11 - myInv.foodCount
+        currReward -= 0.01*foodDiff2
 
         if (len(currWorkers) != 1 ): #we only want this to learn that one worker is good
             currReward += -1.0
@@ -194,7 +201,7 @@ class AIPlayer(Player):
             currReward += -0.01 #"less bad" approach
             #runningReward += currReward
 
-        #print str(currReward) + " is the reward"
+        # print str(currReward) + " is the reward"
         return currReward
 
     ##
@@ -214,19 +221,25 @@ class AIPlayer(Player):
         for move in moveList:
             nextStateList.append(getNextState(currentState, move))
 
-        nextStateList = list(map(self.shrinkState, nextStateList))
+        smallNextStates = list(map(self.shrinkState, nextStateList))
 
         #base case: a terminal state. Return the utility of this state
         #Terminal state is when there's no more moves
         if (len(nextStateList) == 0):
             return Move(END, None, None)
 
-        ##ELSE: after a transition, update the current utility we have been keeping track of
-        #tdLearningEq(nextStateList[i+1].utility)
+        #after a transition, update the current utility we have been keeping track of
         newUtilList = []
         for i in range(len(nextStateList)):
-            nextStateList[i].utility = self.loadedList[i]
-            newUtility = s1.utility + (self.learningRate*(self.getReward(currentState) + self.discountFactor*nextStateList[i].utility - s1.utility))
+
+            if self.gameCount >= 1:
+                lengthDiff = len(self.nextStateList) - len(self.loadedList)
+                smallNextStates[i].utility = self.loadedList[i]
+
+                if (len(nextStateList) > len(self.loadedList)):
+                    nextStateList[lengthDiff:] = self.getReward(nextStateList[i])
+                    
+            newUtility = s1.utility + (self.learningRate*(self.getReward(currentState) + self.discountFactor*smallNextStates[i].utility - s1.utility))
             newUtilList.append(newUtility)
 
         #get the max utility
