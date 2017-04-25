@@ -29,13 +29,12 @@ class AIPlayer(Player):
     #   inputPlayerId - The id to give the new player (int)
     ##
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "HW 6 TD Learning Agent")
-        self.discountFactor = 0.92 #start with this and adjust
-        self.learningRate = 0.99 #start with this and *0.90 each iteration
+        super(AIPlayer,self).__init__(inputPlayerId, "TD Learning Agent")
+        self.discountFactor = 0.83 #start with this and adjust
+        self.learningRate = 0.90 #start with this and *0.90 each iteration
         self.utilityList = [] #initialize for now, change later, we want this to be (consolidatedState, utility)
         self.gameCount = 0 #count how many games we've played
         self.loadedList = []
-        print "in the init method!"
 
     ##
     #getPlacement
@@ -67,9 +66,9 @@ class AIPlayer(Player):
                 moves.append(move)
             return moves
         elif currentState.phase == SETUP_PHASE_2:   #stuff on foe's side
-            print self.gameCount
-            if self.gameCount >= 1:
-                self.loadedList = self.loadUtilList('sunderla17TD.txt')
+            if os.path.isfile('sunderla17_marston18TD.txt'):
+                print "we are using the saved utilities"
+                self.loadedList = self.loadUtilList('sunderla17_marston18TD.txt')
 
             numToPlace = 2
             moves = []
@@ -98,16 +97,9 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
-        #moves = listAllLegalMoves(currentState)
         selectedMove = self.tdLearningEq(currentState)
 
         #initialize the utility with the rewards when they are first seen
-        print self.getReward(currentState)
-
-        #don't do a build move if there are already 3+ ants
-        # numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
-        # while (selectedMove.moveType == BUILD and numAnts >= 3):
-        #     selectedMove = moves[random.randint(0,len(moves) - 1)]
 
         return selectedMove
 
@@ -162,7 +154,7 @@ class AIPlayer(Player):
     # Return: the reward for that given state
     def getReward(self, currentState):
         #runningReward = 0 #the best reward we have seen so far?
-        currReward = 0 #the current reward we are looking at... potentially move this to instance variables
+        currReward = -0.01 #the current reward we are looking at... potentially move this to instance variables
 
         me = currentState.whoseTurn
         enemyInv = currentState.inventories[not me]
@@ -171,11 +163,6 @@ class AIPlayer(Player):
         publicFood = getConstrList(currentState, None, (FOOD,))
         myQueen = getAntList(currentState, me, (QUEEN,))[0]
 
-        for worker in currWorkers:
-            distToFood1 = approxDist(worker.coords, publicFood[0].coords)
-            distToFood2 = approxDist(worker.coords, publicFood[1].coords)
-            currReward -= min(distToFood1,distToFood2)* 0.01
-
         #when a worker is carrying and is on a tunnel or anthill, give this a 1.0 value
         for worker in currWorkers:
             if (worker.carrying):
@@ -183,25 +170,39 @@ class AIPlayer(Player):
                 stepsToTunnel = approxDist(worker.coords, myInv.getTunnels()[0].coords)
                 currReward -= min(stepsToTunnel, stepsToAnthill)*0.01
 
-        if (myQueen.coords != myInv.getAnthill().coords or myQueen.coords != myInv.getTunnels()[0].coords):
-            currReward += 0.01
+                if (worker.coords == myInv.getAnthill().coords or worker.coords == myInv.getTunnels()[0].coords):
+                    currReward += 3.0
+
+                if (worker.coords == publicFood[0].coords or worker.coords == publicFood[1].coords):
+                    currReward -= 1.0
+
+            else:
+                distToFood1 = stepsToReach(currentState, worker.coords, publicFood[0].coords)
+                distToFood2 = stepsToReach(currentState, worker.coords, publicFood[1].coords)
+                if (min(distToFood1,distToFood2) == 1):
+                    currReward += -1.0
+                elif(min(distToFood1,distToFood2) == 0):
+                    currReward += 1.0
+                currReward -= min(distToFood1,distToFood2)* 0.01
+
+                if (worker.coords == publicFood[0].coords or worker.coords == publicFood[1].coords):
+                    currReward += 2.0
+
+        if (myQueen.coords != myInv.getAnthill().coords and myQueen.coords != myInv.getTunnels()[0].coords):
+            if (myQueen.coords != publicFood[0].coords and myQueen.coords != publicFood[1].coords):
+                currReward += 0.04
 
         #else just return -1, because we are somewhere in between these states
         foodDiff = myInv.foodCount - enemyInv.foodCount
         #subtract by food amount that enemy has
-        currReward += 0.01*foodDiff
+        currReward += (0.01*foodDiff)
 
         foodDiff2 = 11 - myInv.foodCount
         currReward -= 0.01*foodDiff2
 
-        if (len(currWorkers) != 1 ): #we only want this to learn that one worker is good
-            currReward += -1.0
-            #runningReward += currReward
-        else:
-            currReward += -0.01 #"less bad" approach
-            #runningReward += currReward
+        if (len(currWorkers) != 1):
+            currReward -= 1.0
 
-        # print str(currReward) + " is the reward"
         return currReward
 
     ##
@@ -230,22 +231,28 @@ class AIPlayer(Player):
 
         #after a transition, update the current utility we have been keeping track of
         newUtilList = []
+        randFloat = random.uniform(0.0, 0.0001)
         for i in range(len(nextStateList)):
 
-            if self.gameCount >= 1:
-                lengthDiff = len(self.nextStateList) - len(self.loadedList)
+            if len(self.loadedList) != 0:
+                lengthDiff = len(nextStateList) - len(self.loadedList)
                 smallNextStates[i].utility = self.loadedList[i]
 
                 if (len(nextStateList) > len(self.loadedList)):
+                    print "we have more states now than we did last time..."
                     nextStateList[lengthDiff:] = self.getReward(nextStateList[i])
-                    
+                    list(map(self.shrinkState, nextStateList))
+
             newUtility = s1.utility + (self.learningRate*(self.getReward(currentState) + self.discountFactor*smallNextStates[i].utility - s1.utility))
+            newUtility += randFloat
             newUtilList.append(newUtility)
 
         #get the max utility
         finalUtility = max(newUtilList)
+
         #find the index that we found it
         bestIndex = newUtilList.index(finalUtility)
+        #print moveList[bestIndex]
 
         #this might be where we append utility values to save to a file
         s1.utility = finalUtility
@@ -253,7 +260,6 @@ class AIPlayer(Player):
 
         self.utilityList.append(s1.utility)
         #return the move with that best index!
-        #return finalUtility
         return moveList[bestIndex]
 
 
@@ -264,7 +270,7 @@ class AIPlayer(Player):
     # takes our utlity list and saves it to a hardcoded file name.
     #
     def saveUtilList(self, utilList):
-        myFile = open('sunderla17TD.txt', 'w')
+        myFile = open('sunderla17_marston18TD.txt', 'w')
 
         for item in utilList:
             myFile.write("%s\n" % item)
@@ -300,10 +306,12 @@ class AIPlayer(Player):
         self.gameCount += 1
 
         if self.learningRate >= 0.01 and self.learningRate < 1.0:
-            self.learningRate = 0.99/math.sqrt(self.gameCount)
+            self.learningRate = 0.90/math.sqrt(self.gameCount)
             print str(self.learningRate) + " after changing the learning rate"
         if hasWon:
             print "we won!!"
+            #save the utility list for sure?
+
         return hasWon
 
 ##
